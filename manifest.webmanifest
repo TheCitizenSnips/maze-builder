@@ -1,0 +1,31 @@
+{
+  "name": "Maze Builder",
+  "short_name": "Maze Builder",
+  "description": "Build mazes, watch animated pathfinding, or solve them yourself with Apple Pencil or touch.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f2f2f7",
+  "theme_color": "#f2f2f7",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "./icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
