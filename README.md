@@ -70,3 +70,28 @@ Open the GitHub Pages URL in Safari, then:
 **Share → Add to Home Screen → Open as Web App**
 
 After the first successful load the service worker caches the app for offline use.
+
+
+## Automatic updates
+
+This edition no longer requires manual service-worker cache version bumps for ordinary app updates.
+
+When the device is online, the service worker uses a **network-first** strategy for the app HTML, JavaScript, CSS, manifest, and icon assets:
+
+1. GitHub Pages is checked for the newest file.
+2. The newest successful response is saved into the offline runtime cache.
+3. If the device is offline, that last successful cached copy is used instead.
+
+The app also explicitly checks the service worker for updates on launch and requests the worker script without relying on the browser's normal HTTP cache.
+
+For normal future releases, the workflow is simply:
+
+```text
+Edit files → commit/push to GitHub → GitHub Pages deploys → open the app online
+```
+
+You do **not** need to change a `CACHE_VERSION` value anymore.
+
+### First upgrade from an older package
+
+Older builds used cache-first versioned storage. This release removes the known old Maze Builder cache names during activation. After publishing this version, open the installed app while online and then close/reopen it once. After that one-time migration, future updates follow the automatic flow above.

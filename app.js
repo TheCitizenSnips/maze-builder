@@ -1302,7 +1302,7 @@
     }
 
     try {
-      const registration = await navigator.serviceWorker.register('./service-worker.js', { scope: './' });
+      const registration = await navigator.serviceWorker.register('./service-worker.js', { scope: './', updateViaCache: 'none' });
       await navigator.serviceWorker.ready;
 
       offlineBadgeText.textContent = navigator.serviceWorker.controller
