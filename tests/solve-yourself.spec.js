@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const {
   openApp, readMaze, growMaze, shortestPath, makePointer, defaultPointerType,
-  traceCells, metric, toggleWall, cellCenter, blankRoute, cellsWithClass
+  traceCells, metric, toggleWall, cellCenter, blankRoute, blocked
 } = require('./helpers');
 
 /** The route the player has drawn, read back from the SVG overlay. */
@@ -23,10 +23,10 @@ async function userRoute(page) {
 function expectLegalRoute(route, maze) {
   for (let i = 0; i < route.length; i++) {
     expect(route[i], 'every route point sits on a cell').toBeTruthy();
-    expect(maze.walls[route[i].r][route[i].c], 'route never enters a wall').toBe(false);
     if (i > 0) {
       const step = Math.abs(route[i].r - route[i - 1].r) + Math.abs(route[i].c - route[i - 1].c);
       expect(step, 'route moves one square at a time, never diagonally').toBe(1);
+      expect(blocked(maze, route[i - 1], route[i]), 'route never crosses a wall').toBe(false);
     }
   }
   const ids = route.map(p => `${p.r},${p.c}`);
@@ -51,15 +51,15 @@ test.describe('Solve It Yourself', () => {
 
   test('the shortest route scores a Perfect Route at 100%', async ({ page }) => {
     await enterSolveMode(page);
-    expect(await metric(page, 3)).toBe('17');
+    expect(await metric(page, 3)).toBe('21');
 
     await traceCells(page, blankRoute(11), { pointer });
 
     await expect(page.locator('#successSheet')).toBeVisible();
     await expect(page.locator('#successKicker')).toHaveText('Perfect Route');
     await expect(page.locator('#successEfficiency')).toHaveText('100%');
-    await expect(page.locator('#successCells')).toHaveText('17');
-    await expect(page.locator('#successBest')).toHaveText('17');
+    await expect(page.locator('#successCells')).toHaveText('21');
+    await expect(page.locator('#successBest')).toHaveText('21');
     await expect(page.locator('#successTime')).toHaveText(/^\d+\.\ds$/);
     await expect(page.locator('#userPathOverlay')).toHaveClass(/success/);
     await expect(page.locator('#phaseLabel')).toHaveText('Complete');
@@ -84,21 +84,21 @@ test.describe('Solve It Yourself', () => {
     expect(await userRoute(page)).toEqual([]);
   });
 
-  test('walls stop the line', async ({ page }) => {
-    await toggleWall(page, 1, 4);
+  test('a thin wall between two squares stops the line', async ({ page }) => {
+    await toggleWall(page, 0, 3, 'right');
     await enterSolveMode(page);
-    await traceCells(page, [1, 2, 3, 4, 5, 6].map(c => ({ r: 1, c })), { pointer, keepDown: true });
+    await traceCells(page, [0, 1, 2, 3, 4, 5, 6].map(c => ({ r: 0, c })), { pointer, keepDown: true });
 
     const route = await userRoute(page);
-    expect(route).toEqual([{ r: 1, c: 1 }, { r: 1, c: 2 }, { r: 1, c: 3 }]);
+    expect(route).toEqual([{ r: 0, c: 0 }, { r: 0, c: 1 }, { r: 0, c: 2 }, { r: 0, c: 3 }]);
     expectLegalRoute(route, await readMaze(page));
     await pointer.up();
   });
 
   test('a single quick flick along a corridor is not lost', async ({ page }) => {
     await enterSolveMode(page);
-    const s = await cellCenter(page, 1, 1);
-    const far = await cellCenter(page, 1, 8);
+    const s = await cellCenter(page, 0, 0);
+    const far = await cellCenter(page, 0, 7);
     await pointer.down(s.x, s.y);
     await pointer.move(far.x, far.y);
 
@@ -109,10 +109,10 @@ test.describe('Solve It Yourself', () => {
   });
 
   test('a quick flick cannot jump over a wall', async ({ page }) => {
-    for (let r = 0; r <= 9; r++) await toggleWall(page, r, 3);
+    for (let r = 0; r <= 9; r++) await toggleWall(page, r, 2, 'right');
     await enterSolveMode(page);
-    const s = await cellCenter(page, 1, 1);
-    const beyond = await cellCenter(page, 1, 6);
+    const s = await cellCenter(page, 0, 0);
+    const beyond = await cellCenter(page, 0, 6);
     await pointer.down(s.x, s.y);
     await pointer.move(beyond.x, beyond.y);
 
@@ -124,45 +124,72 @@ test.describe('Solve It Yourself', () => {
 
   test('cutting a corner diagonally still follows the corridor', async ({ page }) => {
     await enterSolveMode(page);
-    const s = await cellCenter(page, 1, 1);
-    const diag = await cellCenter(page, 2, 2);
+    const s = await cellCenter(page, 0, 0);
+    const diag = await cellCenter(page, 1, 1);
     await pointer.down(s.x, s.y);
     await pointer.move(diag.x, diag.y);
 
     const route = await userRoute(page);
     expect(route).toHaveLength(3);
-    expect(route[2]).toEqual({ r: 2, c: 2 });
+    expect(route[2]).toEqual({ r: 1, c: 1 });
     expectLegalRoute(route, await readMaze(page));
+    await pointer.up();
+  });
+
+  test('cutting a corner goes round a wall on the near side', async ({ page }) => {
+    await toggleWall(page, 0, 0, 'right');
+    await enterSolveMode(page);
+    const s = await cellCenter(page, 0, 0);
+    const diag = await cellCenter(page, 1, 1);
+    await pointer.down(s.x, s.y);
+    await pointer.move(diag.x, diag.y);
+
+    const route = await userRoute(page);
+    expect(route).toEqual([{ r: 0, c: 0 }, { r: 1, c: 0 }, { r: 1, c: 1 }]);
+    expectLegalRoute(route, await readMaze(page));
+    await pointer.up();
+  });
+
+  test('a diagonal flick cannot squeeze between two walls', async ({ page }) => {
+    await toggleWall(page, 0, 0, 'right');
+    await toggleWall(page, 1, 0, 'right');
+    await enterSolveMode(page);
+    const s = await cellCenter(page, 0, 0);
+    const diag = await cellCenter(page, 1, 1);
+    await pointer.down(s.x, s.y);
+    await pointer.move(diag.x, diag.y);
+
+    expect(await userRoute(page)).toEqual([{ r: 0, c: 0 }]);
     await pointer.up();
   });
 
   test('backtracking retracts the line but still counts as effort', async ({ page }) => {
     await enterSolveMode(page);
     const wander = [
-      { r: 1, c: 1 }, { r: 1, c: 2 }, { r: 1, c: 3 }, { r: 1, c: 4 },
-      { r: 1, c: 3 }, { r: 1, c: 2 }
+      { r: 0, c: 0 }, { r: 0, c: 1 }, { r: 0, c: 2 }, { r: 0, c: 3 },
+      { r: 0, c: 2 }, { r: 0, c: 1 }
     ];
     await traceCells(page, wander, { pointer, keepDown: true });
 
-    expect(await userRoute(page)).toEqual([{ r: 1, c: 1 }, { r: 1, c: 2 }]);
+    expect(await userRoute(page)).toEqual([{ r: 0, c: 0 }, { r: 0, c: 1 }]);
     expect(await metric(page, 2)).toBe('6'); // S + 3 forward + 2 back
     expect(await metric(page, 5)).toBe('2');
 
     // Finish along the best route from here: extra effort means under 100%.
     const rest = blankRoute(11).slice(1);
-    await traceCells(page, [{ r: 1, c: 2 }, ...rest], { pointer, alreadyDown: true });
+    await traceCells(page, rest, { pointer, alreadyDown: true });
     await expect(page.locator('#successSheet')).toBeVisible();
-    await expect(page.locator('#successCells')).toHaveText('21');
-    await expect(page.locator('#successEfficiency')).toHaveText('81%');
+    await expect(page.locator('#successCells')).toHaveText('25'); // 6 so far + 19 more
+    await expect(page.locator('#successEfficiency')).toHaveText('84%'); // 21 / 25
     await expect(page.locator('#successKicker')).toHaveText('Great Solve');
   });
 
   test('the line cannot loop back through a square it already used', async ({ page }) => {
     await enterSolveMode(page);
     await traceCells(page, [
-      { r: 1, c: 1 }, { r: 1, c: 2 }, { r: 2, c: 2 }, { r: 2, c: 1 }, { r: 1, c: 1 }
+      { r: 0, c: 0 }, { r: 0, c: 1 }, { r: 1, c: 1 }, { r: 1, c: 0 }, { r: 0, c: 0 }
     ], { pointer, keepDown: true });
-    expect(await userRoute(page)).toEqual([{ r: 1, c: 1 }, { r: 1, c: 2 }, { r: 2, c: 2 }, { r: 2, c: 1 }]);
+    expect(await userRoute(page)).toEqual([{ r: 0, c: 0 }, { r: 0, c: 1 }, { r: 1, c: 1 }, { r: 1, c: 0 }]);
     await pointer.up();
   });
 
@@ -196,8 +223,8 @@ test.describe('Solve It Yourself', () => {
     await traceCells(page, blankRoute(11).slice(0, 4), { pointer });
     await expect(page.locator('#phaseLabel')).toHaveText('Paused');
 
-    const endPt = await cellCenter(page, 1, 4);
-    const next = await cellCenter(page, 1, 5);
+    const endPt = await cellCenter(page, 0, 3);
+    const next = await cellCenter(page, 0, 4);
     const offset = (next.x - endPt.x) * 0.65;
     await pointer.down(endPt.x + offset, endPt.y);
     await expect(page.locator('#phaseLabel')).toHaveText('Tracing');
@@ -266,7 +293,7 @@ test.describe('Solve It Yourself', () => {
     await expect(page.locator('#successSheet')).toBeVisible();
     await page.click('#successCloseBtn');
     await expect(page.locator('#successSheet')).toBeHidden();
-    expect(await userRoute(page)).toHaveLength(17);
+    expect(await userRoute(page)).toHaveLength(21);
 
     await traceCells(page, blankRoute(11).slice(0, 3), { pointer, keepDown: true });
     await expect(page.locator('#phaseLabel')).toHaveText('Tracing');
@@ -283,7 +310,8 @@ test.describe('Solve It Yourself', () => {
   });
 
   test('a maze with no route does not pretend it can be solved', async ({ page }) => {
-    for (const [r, c] of [[8, 8], [8, 9], [8, 10], [9, 8], [10, 8]]) await toggleWall(page, r, c);
+    await toggleWall(page, 10, 9, 'right');
+    await toggleWall(page, 9, 10, 'bottom');
     await page.click('#userSolveBtn');
     await expect(page.locator('#phaseLabel')).toHaveText('No Path');
     await expect(page.locator('#userSolveBtn')).toHaveText(/Solve It Yourself/);

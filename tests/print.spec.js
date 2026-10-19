@@ -20,12 +20,16 @@ test.describe('Printing', () => {
     const colours = await page.evaluate(() => {
       const bg = sel => getComputedStyle(document.querySelector(sel)).backgroundColor;
       return {
-        wall: bg('#maze .cell.wall'),
+        wall: getComputedStyle(document.querySelector('#wallLayer line.on')).stroke,
+        wallOpacity: getComputedStyle(document.querySelector('#wallLayer line.on')).opacity,
+        border: getComputedStyle(document.getElementById('maze')).borderTopColor,
         explored: bg('#maze .cell.visited:not(.solution):not(.start):not(.end)'),
         gold: bg('#maze .cell.solution:not(.start):not(.end)')
       };
     });
     expect(colours.wall).toBe('rgb(28, 43, 79)');
+    expect(colours.wallOpacity).toBe('1');
+    expect(colours.border).toBe('rgb(28, 43, 79)');
     expect(colours.explored).toBe('rgb(255, 255, 255)');
     expect(colours.gold).toBe('rgb(255, 214, 10)');
   });
@@ -35,8 +39,8 @@ test.describe('Printing', () => {
     await setSize(page, 25);
     await page.emulateMedia({ media: 'print' });
     const width = await page.locator('#maze').evaluate(el => el.getBoundingClientRect().width);
-    // 7in of cells plus the 2px border on each side, at 96 CSS px per inch.
-    expect(width).toBeLessThanOrEqual(7 * 96 + 4);
+    // 7in of cells plus the outside wall on each side, at 96 CSS px per inch.
+    expect(width).toBeLessThanOrEqual(7 * 96 + 10);
   });
 
   test('the Pencil line and result sheet are not printed', async ({ page }) => {

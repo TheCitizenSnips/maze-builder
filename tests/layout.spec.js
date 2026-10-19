@@ -84,7 +84,7 @@ test.describe('Layout', () => {
     await expect.poll(() => page.evaluate(() => {
       const raw = document.getElementById('userPathLine').getAttribute('points').trim().split(/\s+/);
       const [x, y] = raw[raw.length - 1].split(',').map(Number);
-      const cell = document.querySelector('#maze .cell[data-r="1"][data-c="5"]');
+      const cell = document.querySelector('#maze .cell[data-r="0"][data-c="4"]');
       return Math.hypot(cell.offsetLeft + cell.offsetWidth / 2 - x, cell.offsetTop + cell.offsetHeight / 2 - y) < 1;
     })).toBe(true);
   });

@@ -2,6 +2,17 @@
 
 This build adds a full user-solving experience designed for iPhone and iPad.
 
+## Walls
+
+Every square in the grid is open path. Walls are thin lines on the edges
+between squares, like cell borders in a spreadsheet: you cannot cross them,
+but they do not take up a square. The thicker outside border is always a
+wall.
+
+In **Walls** mode, tap a grid line to add or remove a wall, or drag along a
+line to draw several at once. Grown mazes knock out one edge at a time until
+every square is joined, which leaves room for long, winding corridors.
+
 ## Solve It Yourself
 
 Tap **Solve It Yourself** and trace a route directly through the maze using:
@@ -10,7 +21,7 @@ Tap **Solve It Yourself** and trace a route directly through the maze using:
 - finger / touch
 - mouse when testing on a desktop
 
-The route must start on **S** and move continuously through open neighboring cells.
+The route must start on **S** and move continuously through neighboring cells without crossing a wall.
 
 The path is drawn as a smooth blue line over the maze. It updates live as you move.
 
