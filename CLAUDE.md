@@ -144,7 +144,7 @@ All application paths should remain relative, such as:
 This is required so the application works from a GitHub Pages project URL such as:
 
 ```text
-https://USERNAME.github.io/maze-builder/
+https://thecitizensnips.github.io/maze-builder/
 ```
 
 Do not assume deployment at the origin root.
@@ -180,6 +180,14 @@ GitHub Pages is configured to deploy:
 ```text
 main → / (root)
 ```
+
+The live published app is:
+
+```text
+https://thecitizensnips.github.io/maze-builder/
+```
+
+Use this URL to check a change after it is pushed to `main`.
 
 Do not add a build process unless there is a strong product reason.
 
