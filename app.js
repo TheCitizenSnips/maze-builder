@@ -1,5 +1,6 @@
 (() => {
   const mazeEl = document.getElementById('maze');
+  const wallLayer = document.getElementById('wallLayer');
   const sizeSelect = document.getElementById('sizeSelect');
   const speedSelect = document.getElementById('speedSelect');
   const statusEl = document.getElementById('status');
@@ -47,12 +48,15 @@
 
   let size = Number(sizeSelect.value);
   let grid = [];
+  let walls = { right: [], bottom: [] };
+  let wallEls = { right: [], bottom: [] };
   let start = null;
   let end = null;
   let mode = 'draw';
   let drawing = false;
   let drawValue = true;
   let lastPainted = null;
+  let drawLastPoint = null;
 
   let runId = 0;
   let running = false;
@@ -135,6 +139,13 @@
     return Number(speedSelect.value);
   }
 
+  // Thin walls make every square part of the maze, so a big grid has far
+  // more steps to grow. Quicken each step as the grid grows so a large maze
+  // still finishes while a child is watching; small mazes keep full speed.
+  function growthDelay() {
+    return currentDelay() * Math.min(1, Math.sqrt(121 / (size * size)));
+  }
+
   function cancelAnimation() {
     runId++;
     running = false;
@@ -159,7 +170,6 @@
 
   function createCellState() {
     return {
-      wall: false,
       visited: false,
       frontier: false,
       current: false,
@@ -194,18 +204,97 @@
     grid = Array.from({ length: size }, () =>
       Array.from({ length: size }, () => createCellState())
     );
+    walls = makeWalls(false);
 
-    start = { r: 1, c: 1 };
-    end = { r: size - 2, c: size - 2 };
+    start = { r: 0, c: 0 };
+    end = { r: size - 1, c: size - 1 };
 
     render();
     resetMetrics();
-    setStatus('Draw walls with your finger, or grow a maze from scratch.', 'Ready');
+    setStatus('Draw walls along the grid lines, or grow a maze from scratch.', 'Ready');
+  }
+
+  // Walls sit on the edges between squares, like cell borders in a
+  // spreadsheet, so every square is open path. right[r][c] is the edge
+  // between (r, c) and (r, c + 1); bottom[r][c] is the edge between (r, c)
+  // and (r + 1, c). The outside of the grid is always a wall.
+  function makeWalls(value) {
+    return {
+      right: Array.from({ length: size }, () => Array(size - 1).fill(value)),
+      bottom: Array.from({ length: size - 1 }, () => Array(size).fill(value))
+    };
+  }
+
+  function inBounds(p) {
+    return p.r >= 0 && p.c >= 0 && p.r < size && p.c < size;
+  }
+
+  // The edge shared by two orthogonally adjacent squares, or null.
+  function edgeBetween(a, b) {
+    if (a.r === b.r && Math.abs(a.c - b.c) === 1) return { side: 'right', r: a.r, c: Math.min(a.c, b.c) };
+    if (a.c === b.c && Math.abs(a.r - b.r) === 1) return { side: 'bottom', r: Math.min(a.r, b.r), c: a.c };
+    return null;
+  }
+
+  function hasWall(edge) {
+    return walls[edge.side][edge.r][edge.c];
+  }
+
+  // The one movement rule every mode shares: one square across an open edge.
+  function canMove(a, b) {
+    if (!inBounds(a) || !inBounds(b)) return false;
+    const edge = edgeBetween(a, b);
+    return Boolean(edge) && !hasWall(edge);
+  }
+
+  function setWall(edge, value, { zap = false } = {}) {
+    walls[edge.side][edge.r][edge.c] = value;
+    const el = wallEls[edge.side][edge.r][edge.c];
+    el.classList.toggle('on', value);
+    el.classList.toggle('zap', !value && zap);
+  }
+
+  function edgeKey(edge) {
+    return `${edge.side}:${edge.r},${edge.c}`;
+  }
+
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+
+  // One line per inner edge, drawn in square units so the walls scale with
+  // the grid. Only the edge that changed is touched afterwards.
+  function renderWalls() {
+    wallLayer.setAttribute('viewBox', `0 0 ${size} ${size}`);
+    wallLayer.innerHTML = '';
+    wallEls = { right: [], bottom: [] };
+    const frag = document.createDocumentFragment();
+
+    for (const side of ['right', 'bottom']) {
+      walls[side].forEach((row, r) => {
+        wallEls[side][r] = row.map((on, c) => {
+          const x = side === 'right' ? c + 1 : c;
+          const y = side === 'right' ? r : r + 1;
+          const line = document.createElementNS(SVG_NS, 'line');
+          line.setAttribute('x1', x);
+          line.setAttribute('y1', y);
+          line.setAttribute('x2', side === 'right' ? x : x + 1);
+          line.setAttribute('y2', side === 'right' ? y + 1 : y);
+          line.setAttribute('data-side', side);
+          line.setAttribute('data-r', r);
+          line.setAttribute('data-c', c);
+          if (on) line.classList.add('on');
+          frag.appendChild(line);
+          return line;
+        });
+      });
+    }
+
+    wallLayer.appendChild(frag);
   }
 
   function render() {
-    mazeEl.style.setProperty('--grid-size', size);
+    mazeStage.style.setProperty('--grid-size', size);
     mazeEl.innerHTML = '';
+    renderWalls();
 
     for (let r = 0; r < size; r++) {
       for (let c = 0; c < size; c++) {
@@ -228,7 +317,6 @@
     const data = grid[r][c];
     cellEl.className = 'cell';
 
-    if (data.wall) cellEl.classList.add('wall');
     if (data.carveTrail) cellEl.classList.add('carve-trail');
     if (data.carveSpark) cellEl.classList.add('carve-spark');
     if (data.carveHead) cellEl.classList.add('carve-head');
@@ -252,7 +340,7 @@
       btn.classList.toggle('active', name === mode);
     }
 
-    if (mode === 'draw') setStatus('Draw mode: tap or drag to add or remove walls.', 'Editing');
+    if (mode === 'draw') setStatus('Walls mode: tap or drag along a grid line to add or remove a wall.', 'Editing');
     if (mode === 'start') setStatus('Tap a square to place the start.', 'Editing');
     if (mode === 'end') setStatus('Tap a square to place the finish.', 'Editing');
   }
@@ -296,44 +384,36 @@
     ));
   }
 
-  function applyToCell(cellEl, isInitial = false) {
-    if (running || userSolveMode || !cellEl || !cellEl.classList.contains('cell')) return;
+  function placeMarker(p) {
+    const isStart = start && start.r === p.r && start.c === p.c;
+    const isEnd = end && end.r === p.r && end.c === p.c;
 
-    const r = Number(cellEl.dataset.r);
-    const c = Number(cellEl.dataset.c);
-    const isStart = start && start.r === r && start.c === c;
-    const isEnd = end && end.r === r && end.c === c;
-
-    if (mode === 'start' || mode === 'end') {
-      // S and E sharing a square would make a maze with nothing to solve.
-      if ((mode === 'start' && isEnd) || (mode === 'end' && isStart)) {
-        setStatus(
-          mode === 'start'
-            ? 'That square is the finish. Pick a different square for the start.'
-            : 'That square is the start. Pick a different square for the finish.',
-          'Editing'
-        );
-        return;
-      }
-
-      if (grid[r][c].wall) grid[r][c].wall = false;
-      if (mode === 'start') start = { r, c };
-      else end = { r, c };
-      clearSearchMarks();
-      render();
-      resetMetrics();
-      const moved = mode === 'start'
-        ? 'Start moved. Ready to search from here.'
-        : 'Finish moved. Ready to search for it.';
-      setMode('draw');
-      setStatus(moved, 'Editing');
+    // S and E sharing a square would make a maze with nothing to solve.
+    if ((mode === 'start' && isEnd) || (mode === 'end' && isStart)) {
+      setStatus(
+        mode === 'start'
+          ? 'That square is the finish. Pick a different square for the start.'
+          : 'That square is the start. Pick a different square for the finish.',
+        'Editing'
+      );
       return;
     }
 
-    if (isStart || isEnd) return;
+    if (mode === 'start') start = { r: p.r, c: p.c };
+    else end = { r: p.r, c: p.c };
+    clearSearchMarks();
+    render();
+    resetMetrics();
+    const moved = mode === 'start'
+      ? 'Start moved. Ready to search from here.'
+      : 'Finish moved. Ready to search for it.';
+    setMode('draw');
+    setStatus(moved, 'Editing');
+  }
 
+  function paintEdge(edge, isInitial) {
     if (isInitial) {
-      drawValue = !grid[r][c].wall;
+      drawValue = !hasWall(edge);
 
       // An old search result could otherwise show a gold path running
       // through a wall that was just drawn.
@@ -345,60 +425,101 @@
       }
     }
 
-    grid[r][c].wall = drawValue;
-    clearTransientState(grid[r][c]);
-    updateCell(r, c);
+    if (hasWall(edge) !== drawValue) setWall(edge, drawValue);
+    lastPainted = edgeKey(edge);
+  }
+
+  // The grid line nearest a point, as the inner edge it belongs to, or null
+  // when the nearest line is the outside border. dist is how far the point
+  // is from that line and cross how far from the nearest line across it,
+  // both in squares from 0 (on the line) to 0.5 (the middle of a square).
+  function pointEdge(x, y, geo = mazeGeometry()) {
+    const gx = (x - geo.left) / geo.cellW;
+    const gy = (y - geo.top) / geo.cellH;
+    if (gx < 0 || gy < 0 || gx > size || gy > size) return null;
+
+    const lineX = Math.round(gx);
+    const lineY = Math.round(gy);
+    const dv = Math.abs(gx - lineX);
+    const dh = Math.abs(gy - lineY);
+    const row = Math.max(0, Math.min(size - 1, Math.floor(gy)));
+    const col = Math.max(0, Math.min(size - 1, Math.floor(gx)));
+
+    if (dv <= dh) {
+      return lineX > 0 && lineX < size ? { side: 'right', r: row, c: lineX - 1, dist: dv, cross: dh } : null;
+    }
+    return lineY > 0 && lineY < size ? { side: 'bottom', r: lineY - 1, c: col, dist: dh, cross: dv } : null;
   }
 
   mazeEl.addEventListener('pointerdown', e => {
-    const cell = e.target.closest('.cell');
-    if (!cell || running || userSolveMode) return;
-    if (drawing && e.pointerId !== drawPointerId) return;
+    if (running || userSolveMode || drawing) return;
+    const geo = mazeGeometry();
+
+    if (mode !== 'draw') {
+      const p = pointCell(e.clientX, e.clientY, geo);
+      if (!p) return;
+      e.preventDefault();
+      placeMarker(p);
+      return;
+    }
 
     e.preventDefault();
+    const edge = pointEdge(e.clientX, e.clientY, geo);
+    if (!edge) {
+      setStatus('The outside wall is always there. Draw along the lines inside the maze.', 'Editing');
+      return;
+    }
+
     drawing = true;
     drawPointerId = e.pointerId;
-    lastPainted = null;
-
-    if (mode === 'draw') {
-      applyToCell(cell, true);
-      lastPainted = `${cell.dataset.r},${cell.dataset.c}`;
-    } else {
-      applyToCell(cell, true);
-      drawing = false;
-    }
+    drawLastPoint = { x: e.clientX, y: e.clientY };
+    try { mazeEl.setPointerCapture(e.pointerId); } catch (_) {}
+    paintEdge(edge, true);
   });
+
+  // Walk from the last sample in quarter-square steps so a quick stroke
+  // along a line paints every edge it passes. Points near the middle of a
+  // square are skipped because they are not close to any one line, and so
+  // are points near a crossing, where a stroke running straight through
+  // would otherwise sprout a stub across its own path.
+  function paintStrokeTo(x, y) {
+    const geo = mazeGeometry();
+    const from = drawLastPoint || { x, y };
+    const dx = x - from.x;
+    const dy = y - from.y;
+    const stepSize = Math.max(1, Math.min(geo.cellW, geo.cellH) / 4);
+    const steps = Math.max(1, Math.ceil(Math.hypot(dx, dy) / stepSize));
+
+    for (let i = 1; i <= steps; i++) {
+      const edge = pointEdge(from.x + dx * i / steps, from.y + dy * i / steps, geo);
+      if (!edge || edge.dist > 0.3 || edge.cross < 0.25 || edgeKey(edge) === lastPainted) continue;
+      paintEdge(edge, false);
+    }
+
+    drawLastPoint = { x, y };
+  }
 
   mazeEl.addEventListener('pointermove', e => {
     if (!drawing || mode !== 'draw' || running || userSolveMode) return;
     if (e.pointerId !== drawPointerId) return;
     e.preventDefault();
 
-    const el = document.elementFromPoint(e.clientX, e.clientY);
-    const cell = el && el.closest ? el.closest('.cell') : null;
-    if (!cell || !mazeEl.contains(cell)) return;
-
-    const id = `${cell.dataset.r},${cell.dataset.c}`;
-    if (id === lastPainted) return;
-
-    applyToCell(cell, false);
-    lastPainted = id;
+    const coalesced = e.getCoalescedEvents ? e.getCoalescedEvents() : [];
+    for (const sample of coalesced.length ? coalesced : [e]) {
+      paintStrokeTo(sample.clientX, sample.clientY);
+    }
   });
 
   function endDrawStroke(e) {
     if (e.pointerId !== drawPointerId) return;
     drawing = false;
     drawPointerId = null;
+    drawLastPoint = null;
     lastPainted = null;
   }
 
   window.addEventListener('pointerup', endDrawStroke);
   window.addEventListener('pointercancel', endDrawStroke);
-
-  function totalPassageTargets() {
-    const oddPerSide = Math.floor(size / 2);
-    return oddPerSide * oddPerSide;
-  }
 
   async function animateMazeGrowth() {
     exitUserSolveMode(false);
@@ -411,25 +532,26 @@
     pauseBtn.disabled = false;
     setInteractiveDisabled(true);
 
+    // Every edge starts as a wall; the generator knocks out one edge per
+    // step until each square is joined to the rest.
     grid = Array.from({ length: size }, () =>
-      Array.from({ length: size }, () => ({
-        ...createCellState(),
-        wall: true
-      }))
+      Array.from({ length: size }, () => createCellState())
     );
+    walls = makeWalls(true);
 
-    start = { r: 1, c: 1 };
-    end = { r: size - 2, c: size - 2 };
+    start = { r: 0, c: 0 };
+    end = { r: size - 1, c: size - 1 };
     render();
 
-    const dirs = [[2,0],[-2,0],[0,2],[0,-2]];
-    const stack = [{ r: 1, c: 1 }];
-    const totalTargets = totalPassageTargets();
+    const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+    const carved = Array.from({ length: size }, () => Array(size).fill(false));
+    const stack = [{ r: 0, c: 0 }];
+    const totalTargets = size * size;
     let carvedTargets = 1;
 
-    grid[1][1].wall = false;
-    grid[1][1].carveHead = true;
-    updateCell(1,1);
+    carved[0][0] = true;
+    grid[0][0].carveHead = true;
+    updateCell(0, 0);
 
     useAlgorithmMetricLabels();
     setMetrics({
@@ -458,17 +580,8 @@
       updateCell(cur.r, cur.c);
 
       const choices = dirs
-        .map(([dr, dc]) => ({
-          r: cur.r + dr,
-          c: cur.c + dc,
-          dr,
-          dc
-        }))
-        .filter(n =>
-          n.r > 0 && n.c > 0 &&
-          n.r < size - 1 && n.c < size - 1 &&
-          grid[n.r][n.c].wall
-        );
+        .map(([dr, dc]) => ({ r: cur.r + dr, c: cur.c + dc }))
+        .filter(n => inBounds(n) && !carved[n.r][n.c]);
 
       if (!choices.length) {
         grid[cur.r][cur.c].carveHead = false;
@@ -490,25 +603,18 @@
           shortest: '—'
         });
 
-        if (!(await pace(Math.max(6, currentDelay() * 0.45), myRunId))) return;
+        if (!(await pace(Math.max(6, growthDelay() * 0.45), myRunId))) return;
         continue;
       }
 
       const next = choices[Math.floor(Math.random() * choices.length)];
-      const mid = {
-        r: cur.r + next.dr / 2,
-        c: cur.c + next.dc / 2
-      };
 
       grid[cur.r][cur.c].carveHead = false;
       grid[cur.r][cur.c].carveTrail = true;
 
-      for (const p of [mid, next]) {
-        grid[p.r][p.c].wall = false;
-        grid[p.r][p.c].carveSpark = true;
-        updateCell(p.r, p.c);
-      }
-
+      setWall(edgeBetween(cur, next), false, { zap: true });
+      carved[next.r][next.c] = true;
+      grid[next.r][next.c].carveSpark = true;
       grid[next.r][next.c].carveHead = true;
       updateCell(cur.r, cur.c);
       updateCell(next.r, next.c);
@@ -524,12 +630,9 @@
         shortest: '—'
       });
 
-      if (!(await pace(currentDelay(), myRunId))) return;
+      if (!(await pace(growthDelay(), myRunId))) return;
 
-      grid[mid.r][mid.c].carveSpark = false;
-      grid[mid.r][mid.c].carveTrail = true;
       grid[next.r][next.c].carveSpark = false;
-      updateCell(mid.r, mid.c);
       updateCell(next.r, next.c);
     }
 
@@ -580,8 +683,7 @@
         const nr = cur.r + dr;
         const nc = cur.c + dc;
 
-        if (nr < 0 || nc < 0 || nr >= size || nc >= size) continue;
-        if (grid[nr][nc].wall) continue;
+        if (!canMove(cur, { r: nr, c: nc })) continue;
 
         const k = key(nr, nc);
         if (seen.has(k)) continue;
@@ -643,7 +745,7 @@
 
     setStatus('A search wave is spreading from the start. The bright edge is the frontier.', 'Searching');
 
-    const totalOpen = grid.flat().filter(c => !c.wall).length;
+    const totalOpen = size * size;
 
     for (let d = 0; d < result.layers.length; d++) {
       if (!running || myRunId !== runId) return;
@@ -1064,13 +1166,12 @@
 
   function addUserPathCell(next) {
     if (!userTracing || userCompleted) return;
-    if (grid[next.r][next.c].wall) return;
 
     const last = userPath[userPath.length - 1];
     if (!last) return;
     if (last.r === next.r && last.c === next.c) return;
 
-    if (!isAdjacent(last, next)) return;
+    if (!isAdjacent(last, next) || !canMove(last, next)) return;
 
     const previous = userPath.length >= 2 ? userPath[userPath.length - 2] : null;
 
@@ -1117,7 +1218,8 @@
 
   // Move the route toward the cell under the pointer. A stroke that clips a
   // corner lands diagonally; route it through whichever orthogonal neighbour
-  // is open so the line still follows the corridors, never across a wall.
+  // is open on both sides so the line still follows the corridors, never
+  // across a wall.
   function stepUserPathTo(next) {
     const last = userPath[userPath.length - 1];
     if (!last || (last.r === next.r && last.c === next.c)) return;
@@ -1128,11 +1230,10 @@
     }
 
     if (Math.abs(last.r - next.r) !== 1 || Math.abs(last.c - next.c) !== 1) return;
-    if (grid[next.r][next.c].wall) return;
 
     const previous = userPath.length >= 2 ? userPath[userPath.length - 2] : null;
     const via = [{ r: last.r, c: next.c }, { r: next.r, c: last.c }]
-      .filter(p => !grid[p.r][p.c].wall)
+      .filter(p => canMove(last, p) && canMove(p, next))
       .sort((a, b) => {
         const aBack = previous && previous.r === a.r && previous.c === a.c;
         const bBack = previous && previous.r === b.r && previous.c === b.c;

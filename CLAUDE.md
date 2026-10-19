@@ -413,19 +413,23 @@ Do not require Pencil-specific proprietary APIs when standard Pointer Events are
 
 # MAZE GENERATION
 
-## 13. Maze generation algorithm
+## 13. Wall model and maze generation algorithm
+
+Walls are thin borders on the edges between squares, like cell borders in a spreadsheet. Every square is open path; a wall only blocks movement between the two squares it separates. The outside of the grid is always a wall, drawn as the thicker maze border. Start defaults to the top-left square and Finish to the bottom-right.
+
+Walls are stored per edge (`walls.right[r][c]` between `(r, c)` and `(r, c + 1)`, `walls.bottom[r][c]` between `(r, c)` and `(r + 1, c)`), and every mode (generation, BFS, Solve It Yourself, editing) moves through `canMove(a, b)`. Do not reintroduce walls that occupy whole squares.
 
 The current generated-maze algorithm is randomized depth-first search with backtracking.
 
 Conceptually:
 
-1. begin with a grid full of walls
-2. begin from an odd-coordinate passage cell
-3. choose an unvisited cell two positions away
-4. remove the intermediate wall
+1. begin with every inner edge walled
+2. begin from the start square
+3. choose an unvisited neighbouring square
+4. remove the wall between them
 5. advance
 6. when no unvisited neighbor exists, backtrack
-7. continue until all passage targets have been visited
+7. continue until every square has been visited
 
 Generated mazes should remain valid and connected.
 
@@ -969,9 +973,7 @@ Mode changes should be obvious through the segmented-control state.
 
 Start and finish cells must always remain traversable.
 
-If a start or finish is moved onto a wall, remove that wall.
-
-Never allow `S` or `E` to remain hidden inside an impassable wall state.
+With edge walls every square is traversable, so S and E can be placed on any square. Walls may still be drawn around them; the no-path behaviour (section 52) covers a fully enclosed S or E.
 
 ---
 

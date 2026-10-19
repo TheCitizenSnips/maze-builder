@@ -24,25 +24,57 @@ async function setSize(page, size) {
   await expect(page.locator('#maze .cell')).toHaveCount(size * size);
 }
 
-/** Snapshot of the maze as the page shows it. */
+/**
+ * Snapshot of the maze as the page shows it. Walls sit on the edges between
+ * squares: right[r][c] is the wall between (r, c) and (r, c + 1), bottom[r][c]
+ * the wall between (r, c) and (r + 1, c). The outside is always walled.
+ */
 async function readMaze(page) {
   return page.evaluate(() => {
     const cells = [...document.querySelectorAll('#maze .cell')];
     const size = Math.round(Math.sqrt(cells.length));
-    const walls = [];
     const classes = [];
     let start = null;
     let end = null;
     for (const el of cells) {
       const r = Number(el.dataset.r);
       const c = Number(el.dataset.c);
-      (walls[r] ||= [])[c] = el.classList.contains('wall');
       (classes[r] ||= [])[c] = [...el.classList];
       if (el.classList.contains('start')) start = { r, c };
       if (el.classList.contains('end')) end = { r, c };
     }
-    return { size, walls, classes, start, end };
+    const right = Array.from({ length: size }, () => Array(size - 1).fill(false));
+    const bottom = Array.from({ length: size - 1 }, () => Array(size).fill(false));
+    for (const line of document.querySelectorAll('#wallLayer line')) {
+      const side = line.getAttribute('data-side');
+      const r = Number(line.getAttribute('data-r'));
+      const c = Number(line.getAttribute('data-c'));
+      (side === 'right' ? right : bottom)[r][c] = line.classList.contains('on');
+    }
+    return { size, right, bottom, classes, start, end };
   });
+}
+
+/** True when a step from a to b is blocked by a wall, the border, or is not one square. */
+function blocked(maze, a, b) {
+  const inside = p => p.r >= 0 && p.c >= 0 && p.r < maze.size && p.c < maze.size;
+  if (!inside(a) || !inside(b)) return true;
+  if (a.r === b.r && Math.abs(a.c - b.c) === 1) return maze.right[a.r][Math.min(a.c, b.c)];
+  if (a.c === b.c && Math.abs(a.r - b.r) === 1) return maze.bottom[Math.min(a.r, b.r)][a.c];
+  return true;
+}
+
+/** Number of inner walls standing. */
+function wallCount(maze) {
+  return [...maze.right.flat(), ...maze.bottom.flat()].filter(Boolean).length;
+}
+
+/** Every inner edge as { side, r, c }. */
+function allEdges(maze) {
+  const out = [];
+  maze.right.forEach((row, r) => row.forEach((_, c) => out.push({ side: 'right', r, c })));
+  maze.bottom.forEach((row, r) => row.forEach((_, c) => out.push({ side: 'bottom', r, c })));
+  return out;
 }
 
 function cellsWithClass(maze, cls) {
@@ -71,8 +103,7 @@ function shortestPath(maze, from = maze.start, to = maze.end) {
     }
     for (const [dr, dc] of DIRS) {
       const n = { r: cur.r + dr, c: cur.c + dc };
-      if (n.r < 0 || n.c < 0 || n.r >= maze.size || n.c >= maze.size) continue;
-      if (maze.walls[n.r][n.c] || prev.has(k(n))) continue;
+      if (blocked(maze, cur, n) || prev.has(k(n))) continue;
       prev.set(k(n), cur);
       queue.push(n);
     }
@@ -86,8 +117,7 @@ function reachableCount(maze, from = maze.start) {
   for (let i = 0; i < queue.length; i++) {
     for (const [dr, dc] of DIRS) {
       const n = { r: queue[i].r + dr, c: queue[i].c + dc };
-      if (n.r < 0 || n.c < 0 || n.r >= maze.size || n.c >= maze.size) continue;
-      if (maze.walls[n.r][n.c] || seen.has(`${n.r},${n.c}`)) continue;
+      if (blocked(maze, queue[i], n) || seen.has(`${n.r},${n.c}`)) continue;
       seen.add(`${n.r},${n.c}`);
       queue.push(n);
     }
@@ -187,18 +217,27 @@ async function metric(page, n) {
   return (await page.locator(`#${ids[n - 1]}`).textContent()).trim();
 }
 
-/** Click a cell (mouse) to toggle a wall in Walls mode. */
-async function toggleWall(page, r, c) {
+/** The middle of the edge on the right ('right') or bottom ('bottom') of square (r, c). */
+async function edgePoint(page, r, c, side) {
+  const box = await cell(page, r, c).boundingBox();
+  return side === 'right'
+    ? { x: box.x + box.width, y: box.y + box.height / 2 }
+    : { x: box.x + box.width / 2, y: box.y + box.height };
+}
+
+/** Click the middle of an edge (mouse) to toggle its wall in Walls mode. */
+async function toggleWall(page, r, c, side) {
+  if (side !== 'right' && side !== 'bottom') throw new Error(`toggleWall needs a side, got ${side}`);
   await page.locator('#maze').scrollIntoViewIfNeeded();
-  const p = await cellCenter(page, r, c);
+  const p = await edgePoint(page, r, c, side);
   await page.mouse.click(p.x, p.y);
 }
 
-/** Straight route along row 1 then down the last open column of a blank grid. */
+/** Straight route along the top row then down the last column of a blank grid. */
 function blankRoute(size) {
   const route = [];
-  for (let c = 1; c <= size - 2; c++) route.push({ r: 1, c });
-  for (let r = 2; r <= size - 2; r++) route.push({ r, c: size - 2 });
+  for (let c = 0; c < size; c++) route.push({ r: 0, c });
+  for (let r = 1; r < size; r++) route.push({ r, c: size - 1 });
   return route;
 }
 
@@ -207,6 +246,9 @@ module.exports = {
   setSize,
   readMaze,
   cellsWithClass,
+  blocked,
+  wallCount,
+  allEdges,
   shortestPath,
   reachableCount,
   cell,
@@ -217,5 +259,6 @@ module.exports = {
   traceCells,
   metric,
   toggleWall,
+  edgePoint,
   blankRoute
 };

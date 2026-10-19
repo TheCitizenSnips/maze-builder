@@ -1,32 +1,19 @@
 const { test, expect } = require('@playwright/test');
-const { openApp, readMaze, growMaze, reachableCount, cellsWithClass, setSize } = require('./helpers');
+const { openApp, readMaze, growMaze, reachableCount, cellsWithClass, wallCount, shortestPath } = require('./helpers');
 
-/** A perfect maze: border solid, every odd/odd cell open, all open cells connected, no loops. */
+/** Inner edges with no wall: the doors the generator has opened. */
+const doors = maze => 2 * maze.size * (maze.size - 1) - wallCount(maze);
+
+/**
+ * A perfect maze: every square is part of it and reachable from S, and there
+ * are no loops. A spanning tree over N squares has exactly N - 1 doors.
+ */
 function expectPerfectMaze(maze) {
   const n = maze.size;
-  for (let i = 0; i < n; i++) {
-    expect(maze.walls[0][i]).toBe(true);
-    expect(maze.walls[n - 1][i]).toBe(true);
-    expect(maze.walls[i][0]).toBe(true);
-    expect(maze.walls[i][n - 1]).toBe(true);
-  }
-  // Even/even cells are pillars and never carved.
-  for (let r = 0; r < n; r += 2) {
-    for (let c = 0; c < n; c += 2) expect(maze.walls[r][c]).toBe(true);
-  }
-
-  const targets = Math.floor(n / 2) ** 2;
-  let open = 0;
-  for (let r = 1; r < n; r += 2) {
-    for (let c = 1; c < n; c += 2) expect(maze.walls[r][c]).toBe(false);
-  }
-  for (const row of maze.walls) for (const w of row) if (!w) open++;
-
-  // A spanning tree over T rooms has T rooms + (T - 1) doors.
-  expect(open).toBe(targets * 2 - 1);
-  expect(reachableCount(maze)).toBe(open);
-  expect(maze.walls[maze.start.r][maze.start.c]).toBe(false);
-  expect(maze.walls[maze.end.r][maze.end.c]).toBe(false);
+  expect(maze.start).toEqual({ r: 0, c: 0 });
+  expect(maze.end).toEqual({ r: n - 1, c: n - 1 });
+  expect(reachableCount(maze)).toBe(n * n);
+  expect(doors(maze)).toBe(n * n - 1);
 }
 
 test.describe('Growing a maze', () => {
@@ -38,9 +25,10 @@ test.describe('Growing a maze', () => {
     // Mid-growth: a live carving tip and a partly carved grid.
     await expect(page.locator('#maze .cell.carve-head')).toHaveCount(1);
     const mid = await readMaze(page);
-    const openMid = mid.walls.flat().filter(w => !w).length;
-    expect(openMid).toBeGreaterThan(0);
-    expect(openMid).toBeLessThan(49 * 2 - 1);
+    expect(doors(mid)).toBeGreaterThan(0);
+    expect(doors(mid)).toBeLessThan(15 * 15 - 1);
+    // Knocked-out walls flash as they go.
+    expect(await page.locator('#wallLayer line.zap').count()).toBeGreaterThan(0);
 
     await expect(page.locator('#phaseLabel')).toHaveText('Built', { timeout: 30_000 });
     const maze = await readMaze(page);
@@ -58,9 +46,15 @@ test.describe('Growing a maze', () => {
     });
   }
 
-  test('several mazes in a row are all valid', async ({ page }) => {
-    await openApp(page, { size: 11 });
-    for (let i = 0; i < 4; i++) expectPerfectMaze(await growMaze(page));
+  test('a grown maze zig-zags: long corridors that double back on themselves', async ({ page }) => {
+    await openApp(page, { size: 15 });
+    const maze = await growMaze(page);
+    // Thin walls leave every square as path, so the route through a 15 × 15
+    // maze winds far beyond the 29 squares of a straight corner-to-corner run
+    // (a depth-first maze that happened to run straight is vanishingly rare).
+    expect(shortestPath(maze).length).toBeGreaterThan(29);
+    // Every square stays open: no square is ever painted as a wall.
+    await expect(page.locator('#maze .cell.wall')).toHaveCount(0);
   });
 
   test('backtracking is visible: the tip retreats instead of vanishing', async ({ page }) => {
@@ -100,7 +94,8 @@ test.describe('Growing a maze', () => {
     const frozen = await readMaze(page);
     await page.waitForTimeout(600);
     const later = await readMaze(page);
-    expect(later.walls).toEqual(frozen.walls);
+    expect(later.right).toEqual(frozen.right);
+    expect(later.bottom).toEqual(frozen.bottom);
 
     await page.click('#pauseBtn');
     await expect(page.locator('#phaseLabel')).toHaveText(/Growing|Built/);
@@ -114,7 +109,7 @@ test.describe('Growing a maze', () => {
       await openApp(page, { size: 21, speed });
       await page.click('#generateBtn');
       await page.waitForTimeout(500);
-      return (await readMaze(page)).walls.flat().filter(w => !w).length;
+      return doors(await readMaze(page));
     };
 
     const slow = await carvedAfter('Slow');
