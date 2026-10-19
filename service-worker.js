@@ -27,7 +27,9 @@ const LEGACY_CACHE_NAMES = new Set([
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(APP_ASSETS))
+      // cache: 'reload' skips the browser HTTP cache so the offline copy is
+      // the version just deployed, not an older file GitHub Pages let linger.
+      .then(cache => cache.addAll(APP_ASSETS.map(url => new Request(url, { cache: 'reload' }))))
       .then(() => self.skipWaiting())
   );
 });
@@ -44,24 +46,38 @@ self.addEventListener('activate', event => {
   );
 });
 
-async function cacheResponse(request, response) {
+async function cacheResponse(request, response, alsoCacheAs = null) {
   if (!response || !response.ok || response.type === 'opaque') return response;
 
   const cache = await caches.open(CACHE_NAME);
   await cache.put(request, response.clone());
+  if (alsoCacheAs) await cache.put(alsoCacheAs, response.clone());
   return response;
 }
 
-async function networkFirst(request, fallbackRequest = request) {
+function isAppShellNavigation(request) {
+  const scopePath = new URL(self.registration.scope).pathname;
+  const path = new URL(request.url).pathname;
+  return path === scopePath || path === `${scopePath}index.html`;
+}
+
+async function networkFirst(request, { navigation = false } = {}) {
+  // The app page is stored under one key as well, so an offline launch from
+  // any URL shape (./, ./index.html, ./?source=homescreen) gets the newest
+  // HTML instead of the copy saved when the worker was first installed.
+  const shellKey = navigation && isAppShellNavigation(request) ? './index.html' : null;
+
   try {
     // Revalidate against GitHub Pages whenever the device is online rather than
     // allowing the browser HTTP cache to hide a newly deployed app asset.
     const response = await fetch(request, { cache: 'no-cache' });
-    return await cacheResponse(request, response);
-  } catch (_) {
-    const cached = await caches.match(fallbackRequest);
+    return await cacheResponse(request, response, shellKey);
+  } catch (error) {
+    const cached =
+      (await caches.match(request, { ignoreSearch: navigation })) ||
+      (navigation ? await caches.match('./index.html') : null);
     if (cached) return cached;
-    throw _;
+    throw error;
   }
 }
 
@@ -73,7 +89,7 @@ self.addEventListener('fetch', event => {
   if (url.origin !== self.location.origin) return;
 
   if (request.mode === 'navigate') {
-    event.respondWith(networkFirst(request, './index.html'));
+    event.respondWith(networkFirst(request, { navigation: true }));
     return;
   }
 

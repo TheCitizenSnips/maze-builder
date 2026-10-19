@@ -1235,6 +1235,10 @@ For any material JavaScript edit, run a syntax check if Node is available:
 node --check app.js
 ```
 
+Then run the Playwright suite (`npm test`, see README). It covers the core
+scenarios in section 52 and fails on any console error. Add or update a test
+alongside any behaviour change.
+
 Do not ship known console errors.
 
 ---

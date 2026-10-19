@@ -20,6 +20,7 @@
   const metricLabel5 = document.getElementById('metricLabel5');
 
   const userSolveBtn = document.getElementById('userSolveBtn');
+  const userSolveBtnLabel = userSolveBtn.querySelector('span');
   const mazeStage = document.getElementById('mazeStage');
   const userPathOverlay = document.getElementById('userPathOverlay');
   const userPathGlow = document.getElementById('userPathGlow');
@@ -69,6 +70,10 @@
   let userBacktracks = 0;
   let userOptimalCells = null;
   let userCompleted = false;
+  let userPointerId = null;
+  let userLastPoint = null;
+  let celebrationToken = 0;
+  let drawPointerId = null;
 
   const key = (r, c) => `${r},${c}`;
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -118,6 +123,14 @@
     }
   }
 
+  // Sleep for one animation beat, then hold while paused. Returns false when
+  // the run was cancelled or replaced so stale callers stop touching the grid.
+  async function pace(ms, myRunId) {
+    await sleep(ms);
+    await waitWhilePaused(myRunId);
+    return running && myRunId === runId;
+  }
+
   function currentDelay() {
     return Number(speedSelect.value);
   }
@@ -141,6 +154,7 @@
     document.getElementById('instantBtn').disabled = disabled;
     document.getElementById('blankBtn').disabled = disabled;
     document.getElementById('clearSolutionBtn').disabled = disabled;
+    userSolveBtn.disabled = disabled;
   }
 
   function createCellState() {
@@ -276,38 +290,60 @@
     }
   }
 
+  function hasSearchMarks() {
+    return grid.some(row => row.some(cell =>
+      cell.visited || cell.frontier || cell.current || cell.solution
+    ));
+  }
+
   function applyToCell(cellEl, isInitial = false) {
     if (running || userSolveMode || !cellEl || !cellEl.classList.contains('cell')) return;
 
     const r = Number(cellEl.dataset.r);
     const c = Number(cellEl.dataset.c);
+    const isStart = start && start.r === r && start.c === c;
+    const isEnd = end && end.r === r && end.c === c;
 
-    if (mode === 'start') {
+    if (mode === 'start' || mode === 'end') {
+      // S and E sharing a square would make a maze with nothing to solve.
+      if ((mode === 'start' && isEnd) || (mode === 'end' && isStart)) {
+        setStatus(
+          mode === 'start'
+            ? 'That square is the finish. Pick a different square for the start.'
+            : 'That square is the start. Pick a different square for the finish.',
+          'Editing'
+        );
+        return;
+      }
+
       if (grid[r][c].wall) grid[r][c].wall = false;
-      start = { r, c };
+      if (mode === 'start') start = { r, c };
+      else end = { r, c };
       clearSearchMarks();
       render();
+      resetMetrics();
+      const moved = mode === 'start'
+        ? 'Start moved. Ready to search from here.'
+        : 'Finish moved. Ready to search for it.';
       setMode('draw');
-      setStatus('Start moved. Ready to search from here.', 'Editing');
+      setStatus(moved, 'Editing');
       return;
     }
 
-    if (mode === 'end') {
-      if (grid[r][c].wall) grid[r][c].wall = false;
-      end = { r, c };
-      clearSearchMarks();
-      render();
-      setMode('draw');
-      setStatus('Finish moved. Ready to search for it.', 'Editing');
-      return;
-    }
+    if (isStart || isEnd) return;
 
-    if ((start && start.r === r && start.c === c) ||
-        (end && end.r === r && end.c === c)) {
-      return;
-    }
+    if (isInitial) {
+      drawValue = !grid[r][c].wall;
 
-    if (isInitial) drawValue = !grid[r][c].wall;
+      // An old search result could otherwise show a gold path running
+      // through a wall that was just drawn.
+      if (hasSearchMarks()) {
+        clearSearchMarks();
+        render();
+        resetMetrics();
+        setStatus('The maze changed, so the old search was cleared.', 'Editing');
+      }
+    }
 
     grid[r][c].wall = drawValue;
     clearTransientState(grid[r][c]);
@@ -317,9 +353,11 @@
   mazeEl.addEventListener('pointerdown', e => {
     const cell = e.target.closest('.cell');
     if (!cell || running || userSolveMode) return;
+    if (drawing && e.pointerId !== drawPointerId) return;
 
     e.preventDefault();
     drawing = true;
+    drawPointerId = e.pointerId;
     lastPainted = null;
 
     if (mode === 'draw') {
@@ -333,6 +371,7 @@
 
   mazeEl.addEventListener('pointermove', e => {
     if (!drawing || mode !== 'draw' || running || userSolveMode) return;
+    if (e.pointerId !== drawPointerId) return;
     e.preventDefault();
 
     const el = document.elementFromPoint(e.clientX, e.clientY);
@@ -346,10 +385,15 @@
     lastPainted = id;
   });
 
-  window.addEventListener('pointerup', () => {
+  function endDrawStroke(e) {
+    if (e.pointerId !== drawPointerId) return;
     drawing = false;
+    drawPointerId = null;
     lastPainted = null;
-  });
+  }
+
+  window.addEventListener('pointerup', endDrawStroke);
+  window.addEventListener('pointercancel', endDrawStroke);
 
   function totalPassageTargets() {
     const oddPerSide = Math.floor(size / 2);
@@ -446,7 +490,7 @@
           shortest: '—'
         });
 
-        await sleep(Math.max(6, currentDelay() * 0.45));
+        if (!(await pace(Math.max(6, currentDelay() * 0.45), myRunId))) return;
         continue;
       }
 
@@ -480,7 +524,7 @@
         shortest: '—'
       });
 
-      await sleep(currentDelay());
+      if (!(await pace(currentDelay(), myRunId))) return;
 
       grid[mid.r][mid.c].carveSpark = false;
       grid[mid.r][mid.c].carveTrail = true;
@@ -627,7 +671,7 @@
         'Searching'
       );
 
-      await sleep(Math.max(70, currentDelay() * 2.2));
+      if (!(await pace(Math.max(70, currentDelay() * 2.2), myRunId))) return;
 
       for (const p of layer) {
         grid[p.r][p.c].newFrontier = false;
@@ -636,7 +680,7 @@
         updateCell(p.r, p.c);
       }
 
-      await sleep(Math.max(30, currentDelay() * 0.8));
+      if (!(await pace(Math.max(30, currentDelay() * 0.8), myRunId))) return;
 
       for (const p of layer) {
         grid[p.r][p.c].current = false;
@@ -659,13 +703,13 @@
         grid[end.r][end.c].goalBurst = true;
         updateCell(end.r, end.c);
         setStatus(`Finish found at distance ${d}. Now follow the breadcrumbs back into a shortest route.`, 'Found');
-        await sleep(Math.max(260, currentDelay() * 5));
+        if (!(await pace(Math.max(260, currentDelay() * 5), myRunId))) return;
         grid[end.r][end.c].goalBurst = false;
         updateCell(end.r, end.c);
         break;
       }
 
-      await sleep(Math.max(25, currentDelay() * 0.45));
+      if (!(await pace(Math.max(25, currentDelay() * 0.45), myRunId))) return;
     }
 
     if (!result.found) {
@@ -717,7 +761,7 @@
         'Tracing'
       );
 
-      await sleep(pathDelay);
+      if (!(await pace(pathDelay, myRunId))) return;
     }
 
     const last = result.path[result.path.length - 1];
@@ -726,7 +770,7 @@
     updateCell(last.r, last.c);
     updateCell(end.r, end.c);
 
-    await sleep(Math.max(260, currentDelay() * 4));
+    if (!(await pace(Math.max(260, currentDelay() * 4), myRunId))) return;
 
     grid[end.r][end.c].goalBurst = false;
     updateCell(end.r, end.c);
@@ -860,10 +904,18 @@
     }
   }
 
+  function hideCelebration() {
+    celebrationToken++;
+    successSheet.hidden = true;
+  }
+
   function resetUserAttempt() {
     stopUserTimer();
+    hideCelebration();
     userTracing = false;
     userCompleted = false;
+    userPointerId = null;
+    userLastPoint = null;
     userPath = [];
     userPathSet = new Set();
     userMoves = 0;
@@ -909,8 +961,8 @@
     return Math.min(100, Math.round((userOptimalCells / userMoves) * 100));
   }
 
-  function updateUserMetrics() {
-    const elapsed = userStartedAt ? (performance.now() - userStartedAt) / 1000 : 0;
+  function updateUserMetrics(elapsedMs = userStartedAt ? performance.now() - userStartedAt : 0) {
+    const elapsed = elapsedMs / 1000;
     const efficiency = userEfficiency();
 
     setMetrics({
@@ -937,6 +989,7 @@
 
     userSolveMode = true;
     userSolveBtn.classList.add('active');
+    userSolveBtnLabel.textContent = 'Stop Solving';
     mazeStage.classList.add('user-solving');
     userPathOverlay.classList.remove('success');
     usePlayerMetricLabels();
@@ -951,10 +1004,14 @@
 
   function exitUserSolveMode(updateStatus = true) {
     stopUserTimer();
+    hideCelebration();
     userSolveMode = false;
     userTracing = false;
     userCompleted = false;
+    userPointerId = null;
+    userLastPoint = null;
     userSolveBtn.classList.remove('active');
+    userSolveBtnLabel.textContent = 'Solve It Yourself';
     mazeStage.classList.remove('user-solving');
     userPathOverlay.classList.remove('success');
     userPath = [];
@@ -973,20 +1030,32 @@
     }
   }
 
-  function eventCell(e) {
+  // Grid geometry in client coordinates, measured inside the maze border so
+  // cell maths matches the rendered cells exactly.
+  function mazeGeometry() {
     const rect = mazeEl.getBoundingClientRect();
-    if (
-      e.clientX < rect.left || e.clientX >= rect.right ||
-      e.clientY < rect.top || e.clientY >= rect.bottom
-    ) return null;
+    const left = rect.left + mazeEl.clientLeft;
+    const top = rect.top + mazeEl.clientTop;
+    return {
+      left,
+      top,
+      cellW: mazeEl.clientWidth / size,
+      cellH: mazeEl.clientHeight / size
+    };
+  }
 
-    const innerX = e.clientX - rect.left;
-    const innerY = e.clientY - rect.top;
-    const cellW = rect.width / size;
-    const cellH = rect.height / size;
-    const c = Math.max(0, Math.min(size - 1, Math.floor(innerX / cellW)));
-    const r = Math.max(0, Math.min(size - 1, Math.floor(innerY / cellH)));
+  function pointCell(x, y, geo = mazeGeometry()) {
+    const innerX = x - geo.left;
+    const innerY = y - geo.top;
+    if (innerX < 0 || innerY < 0 || innerX >= geo.cellW * size || innerY >= geo.cellH * size) return null;
+
+    const c = Math.max(0, Math.min(size - 1, Math.floor(innerX / geo.cellW)));
+    const r = Math.max(0, Math.min(size - 1, Math.floor(innerY / geo.cellH)));
     return { r, c };
+  }
+
+  function eventCell(e) {
+    return pointCell(e.clientX, e.clientY);
   }
 
   function isAdjacent(a, b) {
@@ -1046,30 +1115,102 @@
     }
   }
 
+  // Move the route toward the cell under the pointer. A stroke that clips a
+  // corner lands diagonally; route it through whichever orthogonal neighbour
+  // is open so the line still follows the corridors, never across a wall.
+  function stepUserPathTo(next) {
+    const last = userPath[userPath.length - 1];
+    if (!last || (last.r === next.r && last.c === next.c)) return;
+
+    if (isAdjacent(last, next)) {
+      addUserPathCell(next);
+      return;
+    }
+
+    if (Math.abs(last.r - next.r) !== 1 || Math.abs(last.c - next.c) !== 1) return;
+    if (grid[next.r][next.c].wall) return;
+
+    const previous = userPath.length >= 2 ? userPath[userPath.length - 2] : null;
+    const via = [{ r: last.r, c: next.c }, { r: next.r, c: last.c }]
+      .filter(p => !grid[p.r][p.c].wall)
+      .sort((a, b) => {
+        const aBack = previous && previous.r === a.r && previous.c === a.c;
+        const bBack = previous && previous.r === b.r && previous.c === b.c;
+        return Number(aBack) - Number(bBack);
+      })
+      .find(p => !userPathSet.has(cellId(p.r, p.c)) ||
+        (previous && previous.r === p.r && previous.c === p.c));
+
+    if (!via) return;
+
+    addUserPathCell(via);
+    const now = userPath[userPath.length - 1];
+    if (now.r === via.r && now.c === via.c) addUserPathCell(next);
+  }
+
+  // Walk from the previous pointer sample to this one in quarter-cell steps so
+  // a quick finger or Pencil flick cannot skip over a cell and stall the line.
+  function traceUserPointTo(x, y) {
+    const geo = mazeGeometry();
+    const from = userLastPoint || { x, y };
+    const dx = x - from.x;
+    const dy = y - from.y;
+    const stepSize = Math.max(1, Math.min(geo.cellW, geo.cellH) / 4);
+    const steps = Math.max(1, Math.ceil(Math.hypot(dx, dy) / stepSize));
+
+    for (let i = 1; i <= steps; i++) {
+      if (!userTracing || userCompleted) break;
+      const cell = pointCell(from.x + dx * i / steps, from.y + dy * i / steps, geo);
+      if (cell) stepUserPathTo(cell);
+    }
+
+    userLastPoint = { x, y };
+  }
+
   function processUserPointerEvent(e) {
-    const samples = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+    const coalesced = e.getCoalescedEvents ? e.getCoalescedEvents() : [];
+    const samples = coalesced.length ? coalesced : [e];
     for (const sample of samples) {
-      const next = eventCell(sample);
-      if (next) addUserPathCell(next);
+      traceUserPointTo(sample.clientX, sample.clientY);
     }
   }
 
+  function captureUserPointer(e) {
+    userPointerId = e.pointerId;
+    userLastPoint = { x: e.clientX, y: e.clientY };
+    if (e.currentTarget && e.currentTarget.setPointerCapture) {
+      try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
+    }
+  }
+
+  function toolLabel(e) {
+    if (e.pointerType === 'pen') return 'Apple Pencil';
+    if (e.pointerType === 'mouse') return 'the mouse';
+    return 'your finger';
+  }
+
   function startUserTrace(e) {
-    if (!userSolveMode || userCompleted) return;
+    if (!userSolveMode) return;
 
     const p = eventCell(e);
-    if (!p || p.r !== start.r || p.c !== start.c) {
-      setStatus('Start your line on S, then keep the Pencil or finger down as you trace.', 'Your Turn');
+    const onStart = p && p.r === start.r && p.c === start.c;
+
+    if (userCompleted && !onStart) return;
+
+    if (!onStart) {
+      setStatus(
+        userPath.length
+          ? 'Touch the white dot at the end of your blue line to keep going.'
+          : 'Start your line on S, then keep the Pencil or finger down as you trace.',
+        userPath.length ? 'Paused' : 'Your Turn'
+      );
       return;
     }
 
     e.preventDefault();
 
-    if (e.currentTarget.setPointerCapture) {
-      try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
-    }
-
     resetUserAttempt();
+    captureUserPointer(e);
     userTracing = true;
     userPath = [{ r: start.r, c: start.c }];
     userPathSet = new Set([cellId(start.r, start.c)]);
@@ -1078,34 +1219,46 @@
     syncUserOverlay();
     updateUserMetrics();
 
-    const toolName = e.pointerType === 'pen' ? 'Apple Pencil' : 'touch';
-    setStatus(`Tracing with ${toolName}. Stay inside the open corridors and reach E.`, 'Tracing');
+    setStatus(`Tracing with ${toolLabel(e)}. Stay in the open corridors and reach E.`, 'Tracing');
   }
 
   function endUserTrace(e) {
     if (!userSolveMode || !userTracing || userCompleted) return;
+    if (e && userPointerId !== null && e.pointerId !== userPointerId) return;
 
     userTracing = false;
+    userPointerId = null;
+    userLastPoint = null;
     stopUserTimer();
     userPausedElapsedMs = performance.now() - userStartedAt;
-    updateUserMetrics();
+    updateUserMetrics(userPausedElapsedMs);
 
-    setStatus('Line lifted before the finish. Touch the end of your blue route to continue, or clear it and try again.', 'Paused');
+    setStatus('Paused. Touch the end of your blue line to keep going.', 'Paused');
   }
 
+  // Resuming is forgiving: a touch on the end cell, or close to its centre,
+  // picks the line back up. Small hands and a lifted Pencil rarely land on
+  // the exact square.
   function resumeUserTrace(e) {
     if (!userSolveMode || userCompleted || userTracing || !userPath.length) return false;
 
-    const p = eventCell(e);
+    const geo = mazeGeometry();
     const last = userPath[userPath.length - 1];
+    const p = pointCell(e.clientX, e.clientY, geo);
+    const centreX = geo.left + (last.c + 0.5) * geo.cellW;
+    const centreY = geo.top + (last.r + 0.5) * geo.cellH;
+    const near = Math.hypot(e.clientX - centreX, e.clientY - centreY) <= 0.8 * Math.min(geo.cellW, geo.cellH);
+    const onLast = p && p.r === last.r && p.c === last.c;
 
-    if (!p || p.r !== last.r || p.c !== last.c) return false;
+    if (!onLast && !near) return false;
 
     e.preventDefault();
+    captureUserPointer(e);
     userTracing = true;
     startUserTimer(userPausedElapsedMs);
+    traceUserPointTo(e.clientX, e.clientY);
 
-    setStatus('Route resumed from its last point.', 'Tracing');
+    setStatus(`Tracing with ${toolLabel(e)}. Keep going to E.`, 'Tracing');
     return true;
   }
 
@@ -1160,7 +1313,10 @@
 
     userCompleted = true;
     userTracing = false;
+    userPointerId = null;
+    userLastPoint = null;
     stopUserTimer();
+    const token = ++celebrationToken;
 
     const elapsed = userStartedAt ? (performance.now() - userStartedAt) / 1000 : 0;
     const efficiency = userEfficiency() || 100;
@@ -1202,13 +1358,19 @@
     createConfetti();
 
     await sleep(520);
+    // The player may have cleared, exited or started over during the pause.
+    if (token !== celebrationToken || !userSolveMode || !userCompleted) return;
     successSheet.hidden = false;
   }
 
   mazeEl.addEventListener('pointerdown', e => {
     if (!userSolveMode) return;
 
-    if (userPath.length && !userTracing) {
+    // One line at a time: a resting palm or second finger must not restart
+    // or interrupt the stroke already in progress.
+    if (userTracing) return;
+
+    if (userPath.length && !userCompleted) {
       if (resumeUserTrace(e)) return;
     }
 
@@ -1216,7 +1378,7 @@
   });
 
   mazeEl.addEventListener('pointermove', e => {
-    if (!userSolveMode || !userTracing) return;
+    if (!userSolveMode || !userTracing || e.pointerId !== userPointerId) return;
     e.preventDefault();
     processUserPointerEvent(e);
   });
@@ -1240,7 +1402,16 @@
 
   successCloseBtn.addEventListener('click', () => {
     successSheet.hidden = true;
+    setStatus('Nice work. Touch S to try this maze again, or tap Stop Solving.', 'Complete');
   });
+
+  // Keep the route overlay on the cells when the maze changes size for any
+  // reason: rotation, a different grid size, or the layout around it moving.
+  if ('ResizeObserver' in window) {
+    new ResizeObserver(() => {
+      if (userSolveMode) syncUserOverlay();
+    }).observe(mazeEl);
+  }
 
   window.addEventListener('resize', () => {
     if (userSolveMode) syncUserOverlay();
@@ -1298,9 +1469,14 @@
       const registration = await navigator.serviceWorker.register('./service-worker.js', { scope: './', updateViaCache: 'none' });
       await navigator.serviceWorker.ready;
 
-      offlineBadgeText.textContent = navigator.serviceWorker.controller
-        ? 'Offline ready'
-        : 'Offline ready after reload';
+      const showOfflineState = () => {
+        offlineBadgeText.textContent = navigator.serviceWorker.controller
+          ? 'Offline ready'
+          : 'Offline ready after reload';
+      };
+      showOfflineState();
+      // A first-time worker claims this page shortly after it is ready.
+      navigator.serviceWorker.addEventListener('controllerchange', showOfflineState);
       offlineBadge.classList.add('ready');
 
       registration.update().catch(() => {});

@@ -1,0 +1,15 @@
+{
+  "name": "maze-builder",
+  "private": true,
+  "description": "Development-only test tooling. The app itself has no build step and no runtime dependencies.",
+  "scripts": {
+    "test": "playwright test",
+    "test:webkit": "PW_WEBKIT=1 playwright test",
+    "test:headed": "playwright test --headed",
+    "test:report": "playwright show-report",
+    "serve": "node tests/static-server.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1"
+  }
+}
