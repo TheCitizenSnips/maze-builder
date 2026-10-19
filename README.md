@@ -65,7 +65,7 @@ Upload the package contents to the repository root and enable:
 
 ## Install on iPhone / iPad
 
-Open the GitHub Pages URL in Safari, then:
+Open the live app in Safari at https://thecitizensnips.github.io/maze-builder/, then:
 
 **Share → Add to Home Screen → Open as Web App**
 
