@@ -63,6 +63,7 @@
   let userPath = [];
   let userPathSet = new Set();
   let userStartedAt = 0;
+  let userPausedElapsedMs = 0;
   let userTimerId = null;
   let userMoves = 0;
   let userBacktracks = 0;
@@ -261,14 +262,15 @@
 
   function clearSolution() {
     cancelAnimation();
-    setInteractiveDisabled(false);
     clearSearchMarks();
     render();
 
     if (userSolveMode) {
+      // Editing stays locked: the player is still in solve mode.
       resetUserAttempt();
       setStatus('Your route was cleared. Start again from S.', 'Your Turn');
     } else {
+      setInteractiveDisabled(false);
       resetMetrics();
       setStatus('Search visualization cleared. The maze is unchanged.', 'Ready');
     }
@@ -867,6 +869,7 @@
     userMoves = 0;
     userBacktracks = 0;
     userStartedAt = 0;
+    userPausedElapsedMs = 0;
     userPathOverlay.classList.remove('success');
     clearUserCellClasses();
     syncUserOverlay();
@@ -883,9 +886,9 @@
     }
   }
 
-  function startUserTimer() {
+  function startUserTimer(alreadyElapsedMs = 0) {
     stopUserTimer();
-    userStartedAt = performance.now();
+    userStartedAt = performance.now() - alreadyElapsedMs;
 
     userTimerId = setInterval(() => {
       if (!userStartedAt || userCompleted) return;
@@ -1084,6 +1087,7 @@
 
     userTracing = false;
     stopUserTimer();
+    userPausedElapsedMs = performance.now() - userStartedAt;
     updateUserMetrics();
 
     setStatus('Line lifted before the finish. Touch the end of your blue route to continue, or clear it and try again.', 'Paused');
@@ -1099,18 +1103,7 @@
 
     e.preventDefault();
     userTracing = true;
-
-    if (!userStartedAt) {
-      startUserTimer();
-    } else {
-      const priorElapsed = Number(metricProgress.textContent.replace('s','')) || 0;
-      userStartedAt = performance.now() - priorElapsed * 1000;
-      stopUserTimer();
-      userTimerId = setInterval(() => {
-        if (!userStartedAt || userCompleted) return;
-        metricProgress.textContent = `${((performance.now() - userStartedAt) / 1000).toFixed(1)}s`;
-      }, 100);
-    }
+    startUserTimer(userPausedElapsedMs);
 
     setStatus('Route resumed from its last point.', 'Tracing');
     return true;
