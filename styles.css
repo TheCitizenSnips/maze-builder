@@ -1,6 +1,5 @@
 :root {
   --grid-size: 15;
-  --cell-size: min(5vw, 36px);
 
   --bg: #f2f2f7;
   --surface: rgba(255,255,255,0.88);
@@ -239,6 +238,7 @@ button { -webkit-tap-highlight-color: transparent; }
   border: 0;
   background: rgba(118,118,128,0.10);
   border-radius: 10px;
+  min-height: 44px;
   padding: 8px 28px 8px 10px;
   color: var(--blue);
   font-weight: 650;
@@ -374,6 +374,9 @@ select:disabled {
   color: var(--secondary-label);
   font-size: 14px;
   line-height: 1.35;
+  /* Reserve room for two lines so a longer message never pushes the maze
+     down mid-trace and makes a resume touch miss the end of the line. */
+  min-height: calc(2em * 1.35);
 }
 
 .telemetry {
@@ -439,6 +442,7 @@ select:disabled {
 
 .maze-card {
   position: relative;
+  container-type: inline-size;
   overflow: auto;
   -webkit-overflow-scrolling: touch;
   padding: 18px;
@@ -450,6 +454,10 @@ select:disabled {
 }
 
 #maze {
+  /* Cells shrink to fit the card so even 25 × 25 never needs sideways
+     scrolling, which the drawing surface cannot do (touch-action: none). */
+  --cell-size: min(5vw, 36px);
+  --cell-size: max(10px, min(36px, (100cqw - 4px) / var(--grid-size)));
   display: grid;
   grid-template-columns: repeat(var(--grid-size), var(--cell-size));
   grid-template-rows: repeat(var(--grid-size), var(--cell-size));
@@ -684,6 +692,18 @@ select:disabled {
   .info-card { grid-column: 1 / -1; }
 }
 
+@media (min-width: 981px) {
+  /* Side-by-side layout: also keep the whole maze inside the screen height
+     so a Pencil solve on a landscape iPad never needs scrolling. */
+  #maze {
+    --cell-size: max(16px, min(36px, (100cqw - 4px) / var(--grid-size), (100dvh - 380px) / var(--grid-size)));
+  }
+}
+
+@media (max-width: 560px) {
+  .status-text { min-height: calc(3em * 1.35); }
+}
+
 @media (max-width: 720px) {
   .app-shell {
     padding-left: 12px;
@@ -751,13 +771,16 @@ select:disabled {
   }
 
   #maze {
-    --cell-size: 0.32in;
+    /* 7in fits inside Letter and A4 once the page margins are taken. */
+    --cell-size: min(0.32in, 7in / var(--grid-size));
     margin: 0 auto;
     border-radius: 0;
     break-inside: avoid;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
+
+  .cell { transition: none !important; }
 
   .cell.carve-trail,
   .cell.carve-spark,
@@ -770,9 +793,10 @@ select:disabled {
     animation: none !important;
   }
 
-  .cell.frontier:not(.wall):not(.start):not(.end),
-  .cell.current:not(.wall):not(.start):not(.end),
-  .cell.visited:not(.wall):not(.start):not(.end) {
+  /* Explored cells print white, but the gold route (also explored) stays. */
+  .cell.frontier:not(.wall):not(.start):not(.end):not(.solution),
+  .cell.current:not(.wall):not(.start):not(.end):not(.solution),
+  .cell.visited:not(.wall):not(.start):not(.end):not(.solution) {
     background: #fff;
     box-shadow: none;
   }

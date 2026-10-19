@@ -57,6 +57,41 @@ This package still includes:
 - print mode
 - offline PWA support
 
+## Testing locally
+
+The app itself has no build step. The tests are development-only and use
+[Playwright](https://playwright.dev) to drive the real app in a browser with
+mouse, touch and Apple Pencil-style input. You need Node.js 18 or newer.
+
+One-time setup:
+
+```bash
+npm install
+npx playwright install chromium   # add "webkit" too for Safari's engine
+```
+
+Run every test (desktop, iPad and iPhone screen sizes):
+
+```bash
+npm test
+```
+
+Other handy commands:
+
+- `npm run test:webkit` also runs the suite in WebKit at iPad size.
+- `npm run test:headed` shows the browser while the tests run.
+- `npm run test:report` opens the report from the last run, with a trace
+  for any failure.
+- `npm run serve` serves the app at http://localhost:4173/maze-builder/ for
+  trying it by hand.
+
+The tests cover editing, maze growth (every grown maze is checked to be a
+real, fully connected maze), the search wave and its gold shortest path,
+Solve It Yourself (walls, backtracking, lifting and resuming, scoring,
+palm and second-finger touches), layout on iPad and iPhone, printing, and
+offline loading. They still don't replace a quick check on a real iPad
+with Apple Pencil.
+
 ## GitHub Pages
 
 Upload the package contents to the repository root and enable:
