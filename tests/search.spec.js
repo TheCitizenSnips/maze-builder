@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { openApp, readMaze, growMaze, shortestPath, cellsWithClass, toggleWall, metric, cell, blocked } = require('./helpers');
+const { openApp, readMaze, growMaze, shortestPath, cellsWithClass, toggleWall, metric, cell, blocked, watchMazeStillness } = require('./helpers');
 
 /** Gold cells must form one unbroken S→E corridor walk of the true shortest length. */
 function expectGoldIsShortest(maze) {
@@ -70,6 +70,21 @@ test.describe('Computer path discovery', () => {
     expect(await metric(page, 5)).toBe(String(shortest));
     await expect(page.locator('#status')).toContainText(`shortest route of ${shortest} steps`);
     expect(errors).toEqual([]);
+  });
+
+  test('the maze holds still while the search wave runs and the route is traced', async ({ page }) => {
+    await openApp(page, { size: 15, speed: 'Medium' });
+    await growMaze(page);
+    await page.click('#animateBtn');
+    // On iPhone the button sits above the maze; bring the maze back into view first.
+    await page.locator('#maze').scrollIntoViewIfNeeded();
+    const stop = await watchMazeStillness(page);
+
+    await expect(page.locator('#phaseLabel')).toHaveText('Solved', { timeout: 45_000 });
+
+    const { worst, where, frames } = await stop();
+    expect(frames).toBeGreaterThan(30);
+    expect(worst, `largest movement was at ${where}`).toBeLessThan(0.5);
   });
 
   test('Solve Instantly gives the same shortest path', async ({ page }) => {

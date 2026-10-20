@@ -540,9 +540,11 @@ select:disabled {
   animation: electricHead 700ms ease-in-out infinite alternate;
 }
 
+/* Squares never change size or move: the walls are fixed lines on their
+   edges, so a growing or shrinking square makes the whole grid look like it
+   is jumping. Energy shows through colour and glow instead. */
 @keyframes electricSpark {
   0% {
-    transform: scale(.54);
     background: #ffffff;
     box-shadow:
       0 0 0 0 rgba(255,255,255,.95),
@@ -550,7 +552,6 @@ select:disabled {
       0 0 0 0 rgba(105,77,255,.55);
   }
   40% {
-    transform: scale(1.07);
     background: #e9fbff;
     box-shadow:
       0 0 0 2px rgba(255,255,255,.95),
@@ -558,7 +559,6 @@ select:disabled {
       0 0 26px 8px rgba(105,77,255,.36);
   }
   100% {
-    transform: scale(1);
     background: #ffffff;
     box-shadow: 0 0 0 rgba(0,0,0,0);
   }
@@ -614,30 +614,27 @@ select:disabled {
 
 @keyframes frontierArrival {
   0% {
-    transform: scale(.72);
     background: #fff;
-    box-shadow: 0 0 0 0 rgba(50,173,230,.1);
+    box-shadow: inset 0 0 0 0 rgba(50,173,230,0);
   }
   55% {
-    transform: scale(1.08);
     background: #bdeeff;
-    box-shadow: 0 0 14px 5px rgba(50,173,230,.34);
+    box-shadow: inset 0 0 6px 2px rgba(50,173,230,.55);
   }
   100% {
-    transform: scale(1);
     background: var(--frontier);
-    box-shadow: 0 0 0 rgba(0,0,0,0);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.42);
   }
 }
 
 @keyframes frontierPulse {
   from { box-shadow: inset 0 0 0 1px rgba(255,255,255,.42); }
-  to { box-shadow: inset 0 0 0 2px rgba(255,255,255,.82), 0 0 10px rgba(50,173,230,.24); }
+  to { box-shadow: inset 0 0 0 2px rgba(255,255,255,.82), inset 0 0 8px rgba(50,173,230,.35); }
 }
 
 @keyframes currentPulse {
-  from { transform: scale(.96); box-shadow: 0 0 6px rgba(0,122,255,.25); }
-  to { transform: scale(1.08); box-shadow: 0 0 16px rgba(0,122,255,.42); }
+  from { box-shadow: inset 0 0 0 1px rgba(255,255,255,.35); }
+  to { box-shadow: inset 0 0 0 3px rgba(255,255,255,.7); }
 }
 
 .cell.solution:not(.start):not(.end) {
@@ -652,11 +649,9 @@ select:disabled {
 
 @keyframes solutionHead {
   from {
-    transform: scale(.94);
     box-shadow: 0 0 6px rgba(255,214,10,.45);
   }
   to {
-    transform: scale(1.12);
     box-shadow:
       0 0 12px 4px rgba(255,214,10,.68),
       0 0 22px 8px rgba(255,159,10,.20);
@@ -684,15 +679,12 @@ select:disabled {
 }
 
 @keyframes goalBurst {
-  0% { transform: scale(1); }
   45% {
-    transform: scale(1.22);
     box-shadow:
       inset 0 0 0 3px var(--red),
       0 0 0 5px rgba(255,69,58,.18),
       0 0 20px 8px rgba(255,69,58,.28);
   }
-  100% { transform: scale(1); }
 }
 
 .cell.start::after,
@@ -773,6 +765,9 @@ select:disabled {
 @media print {
   @page { size: auto; margin: 0.5in; }
 
+  /* The page background is set on html too; left grey it prints as a big
+     box below the maze wherever the browser prints backgrounds. */
+  html,
   body { background: #fff; }
 
   .nav-bar,
@@ -954,8 +949,8 @@ select:disabled {
 }
 
 @keyframes userBacktrack {
-  0% { background: #ffd6d3; transform: scale(1.08); }
-  100% { background: #fff; transform: scale(1); }
+  0% { background: #ffd6d3; }
+  100% { background: #fff; }
 }
 
 .cell.user-success {
@@ -963,12 +958,9 @@ select:disabled {
 }
 
 @keyframes userSuccessCell {
-  0% { transform: scale(1); }
   45% {
-    transform: scale(1.10);
-    box-shadow: inset 0 0 0 2px rgba(48,209,88,0.35), 0 0 12px rgba(48,209,88,0.35);
+    box-shadow: inset 0 0 0 2px rgba(48,209,88,0.35), inset 0 0 10px rgba(48,209,88,0.35);
   }
-  100% { transform: scale(1); }
 }
 
 /* Success celebration */
