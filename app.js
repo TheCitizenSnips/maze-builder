@@ -3,6 +3,13 @@
   const wallLayer = document.getElementById('wallLayer');
   const sizeSelect = document.getElementById('sizeSelect');
   const speedSelect = document.getElementById('speedSelect');
+  const levelButtons = [...document.querySelectorAll('.level-picker .segment')];
+  const levelLabel = document.getElementById('levelLabel');
+  const dials = {
+    twisty: document.getElementById('twistyDial'),
+    shortcuts: document.getElementById('shortcutsDial'),
+    branches: document.getElementById('branchesDial')
+  };
   const statusEl = document.getElementById('status');
   const phaseLabel = document.getElementById('phaseLabel');
   const pauseBtn = document.getElementById('pauseBtn');
@@ -46,11 +53,20 @@
     end: document.getElementById('endBtn')
   };
 
-  // Settings a child picked last time (size and speed) come back on the next
-  // visit. Only the choices are remembered, never the maze itself. Storage can
-  // be missing or blocked (private browsing), so every access is guarded.
+  // Settings a child picked last time (size, speed and maze style) come back
+  // on the next visit. Only the choices are remembered, never the maze itself.
+  // Storage can be missing or blocked (private browsing), so every access is
+  // guarded.
   const SETTINGS_KEY = 'mazeBuilder.settings';
-  const rememberedSelects = { size: sizeSelect, speed: speedSelect };
+  const rememberedControls = { size: sizeSelect, speed: speedSelect, ...dials };
+
+  // A saved value only comes back if the control can still show it: a
+  // listed option for a menu, a whole step within range for a dial.
+  function isValidSetting(control, value) {
+    if (control.tagName === 'SELECT') return [...control.options].some(option => option.value === value);
+    const n = Number(value);
+    return Number.isInteger(n) && n >= Number(control.min) && n <= Number(control.max);
+  }
 
   function restoreSettings() {
     let saved = null;
@@ -61,15 +77,15 @@
     }
     if (!saved || typeof saved !== 'object') return;
 
-    for (const [key, select] of Object.entries(rememberedSelects)) {
+    for (const [key, control] of Object.entries(rememberedControls)) {
       const value = String(saved[key]);
-      if ([...select.options].some(option => option.value === value)) select.value = value;
+      if (isValidSetting(control, value)) control.value = value;
     }
   }
 
   function saveSettings() {
     const settings = {};
-    for (const [key, select] of Object.entries(rememberedSelects)) settings[key] = select.value;
+    for (const [key, control] of Object.entries(rememberedControls)) settings[key] = control.value;
     try {
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
     } catch (error) {
@@ -111,6 +127,25 @@
   let userLastPoint = null;
   let celebrationToken = 0;
   let drawPointerId = null;
+
+  // Each level is a size plus a setting for each Maze style dial (0 to 4).
+  // Medium is the classic depth-first maze: no turn preference, no
+  // shortcuts, no extra branching.
+  const LEVELS = {
+    easy: { label: 'Easy', size: 11, twisty: 1, shortcuts: 3, branches: 2 },
+    medium: { label: 'Medium', size: 15, twisty: 2, shortcuts: 0, branches: 0 },
+    hard: { label: 'Hard', size: 21, twisty: 4, shortcuts: 0, branches: 1 }
+  };
+
+  // How much the carving tip prefers to keep going straight, how often it
+  // jumps back to start a side path, and what share of squares gets a
+  // shortcut, for dial positions 0 to 4.
+  const STRAIGHT_WEIGHT = [6, 2.5, 1, 0.4, 0.12];
+  const BRANCH_CHANCE = [0, 0.08, 0.2, 0.4, 0.65];
+  const SHORTCUT_SHARE = [0, 0.02, 0.05, 0.09, 0.14];
+  // A side path starts from one of the last few squares the tip carved, so
+  // the jump back stays short enough to watch.
+  const BRANCH_WINDOW = 6;
 
   const key = (r, c) => `${r},${c}`;
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -190,6 +225,8 @@
 
   function setInteractiveDisabled(disabled) {
     sizeSelect.disabled = disabled;
+    for (const btn of levelButtons) btn.disabled = disabled;
+    for (const dial of Object.values(dials)) dial.disabled = disabled;
     buttons.draw.disabled = disabled;
     buttons.start.disabled = disabled;
     buttons.end.disabled = disabled;
@@ -227,6 +264,55 @@
     cell.newFrontier = false;
     cell.solutionHead = false;
     cell.goalBurst = false;
+  }
+
+  function mazeStyle() {
+    return {
+      twisty: Number(dials.twisty.value),
+      shortcuts: Number(dials.shortcuts.value),
+      branches: Number(dials.branches.value)
+    };
+  }
+
+  // The level whose size and dials match the screen, or 'custom'.
+  function currentLevel() {
+    const style = mazeStyle();
+    for (const [name, level] of Object.entries(LEVELS)) {
+      if (level.size === size &&
+          level.twisty === style.twisty &&
+          level.shortcuts === style.shortcuts &&
+          level.branches === style.branches) {
+        return name;
+      }
+    }
+    return 'custom';
+  }
+
+  function syncLevelUI() {
+    const level = currentLevel();
+    for (const btn of levelButtons) {
+      const on = btn.dataset.level === level;
+      btn.classList.toggle('active', on);
+      btn.setAttribute('aria-pressed', String(on));
+    }
+    levelLabel.textContent = level === 'custom' ? 'Custom' : LEVELS[level].label;
+  }
+
+  function setSize(nextSize) {
+    if (nextSize === size) return;
+    size = nextSize;
+    sizeSelect.value = String(size);
+    makeBlankGrid();
+  }
+
+  function applyLevel(name) {
+    if (running) return;
+    const level = LEVELS[name];
+    for (const dialName of Object.keys(dials)) dials[dialName].value = String(level[dialName]);
+    setSize(level.size);
+    syncLevelUI();
+    saveSettings();
+    setStatus(`${level.label} is set. Tap Grow a Maze to build one.`, 'Ready');
   }
 
   function makeBlankGrid() {
@@ -554,6 +640,55 @@
   window.addEventListener('pointerup', endDrawStroke);
   window.addEventListener('pointercancel', endDrawStroke);
 
+  // Shortcuts dial: once the maze is a single-route tree, open a few extra
+  // walls so there is more than one way through. Each one opens a dead end
+  // where possible, so a wrong turn is less of a trap.
+  async function addShortcuts(level, myRunId) {
+    const count = Math.round(SHORTCUT_SHARE[level] * size * size);
+    if (!count) return true;
+
+    setStatus('Adding shortcuts, so there is more than one way through.', 'Growing');
+    const steps = [{ r: 1, c: 0 }, { r: -1, c: 0 }, { r: 0, c: 1 }, { r: 0, c: -1 }];
+    const neighbours = p => steps.map(d => ({ r: p.r + d.r, c: p.c + d.c })).filter(inBounds);
+    const pick = list => list[Math.floor(Math.random() * list.length)];
+
+    for (let i = 0; i < count; i++) {
+      const deadEnds = [];
+      const walled = [];
+      for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+          const p = { r, c };
+          const closed = neighbours(p).filter(n => !canMove(p, n));
+          if (neighbours(p).length - closed.length === 1 && closed.length) deadEnds.push({ p, closed });
+          for (const n of closed) if (n.r > r || n.c > c) walled.push({ a: p, b: n });
+        }
+      }
+      if (!walled.length) break;
+
+      let a;
+      let b;
+      if (deadEnds.length) {
+        const dead = pick(deadEnds);
+        a = dead.p;
+        b = pick(dead.closed);
+      } else {
+        ({ a, b } = pick(walled));
+      }
+
+      setWall(edgeBetween(a, b), false, { zap: true });
+      for (const p of [a, b]) {
+        grid[p.r][p.c].carveSpark = true;
+        updateCell(p.r, p.c);
+      }
+      if (!(await pace(growthDelay() * 2.5, myRunId))) return false;
+      for (const p of [a, b]) {
+        grid[p.r][p.c].carveSpark = false;
+        updateCell(p.r, p.c);
+      }
+    }
+    return true;
+  }
+
   async function animateMazeGrowth() {
     exitUserSolveMode(false);
     cancelAnimation();
@@ -576,24 +711,94 @@
     end = { r: size - 1, c: size - 1 };
     render();
 
+    const style = mazeStyle();
+    const straightWeight = STRAIGHT_WEIGHT[style.twisty];
+    const branchChance = BRANCH_CHANCE[style.branches];
+
     const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
     const carved = Array.from({ length: size }, () => Array(size).fill(false));
+    // The carved squares form a tree: parent and depth let the tip travel
+    // back along real corridors when it retreats or starts a side path.
+    const parent = Array.from({ length: size }, () => Array(size).fill(null));
+    const depth = Array.from({ length: size }, () => Array(size).fill(0));
+    // Squares that may still have uncarved neighbours. With Branches at its
+    // lowest this is exactly the depth-first stack.
     const stack = [{ r: 0, c: 0 }];
     const totalTargets = size * size;
     let carvedTargets = 1;
+
+    const uncarvedNeighbours = p => dirs
+      .map(([dr, dc]) => ({ r: p.r + dr, c: p.c + dc }))
+      .filter(n => inBounds(n) && !carved[n.r][n.c]);
+
+    // Pick the next square, weighting the one straight ahead by the Twisty
+    // dial. A weight of 1 is a plain random choice.
+    function pickNext(cur, choices) {
+      const from = parent[cur.r][cur.c];
+      const weights = choices.map(n => {
+        if (!from) return 1;
+        const straight = n.r - cur.r === cur.r - from.r && n.c - cur.c === cur.c - from.c;
+        return straight ? straightWeight : 1;
+      });
+      let roll = Math.random() * weights.reduce((a, b) => a + b, 0);
+      for (let i = 0; i < choices.length; i++) {
+        roll -= weights[i];
+        if (roll < 0) return choices[i];
+      }
+      return choices[choices.length - 1];
+    }
+
+    // Squares from a (exclusive) to b (inclusive) along carved corridors.
+    function treePath(a, b) {
+      const up = [];
+      const down = [];
+      let x = a;
+      let y = b;
+      while (depth[x.r][x.c] > depth[y.r][y.c]) { x = parent[x.r][x.c]; up.push(x); }
+      while (depth[y.r][y.c] > depth[x.r][x.c]) { down.push(y); y = parent[y.r][y.c]; }
+      while (x.r !== y.r || x.c !== y.c) {
+        x = parent[x.r][x.c];
+        up.push(x);
+        down.push(y);
+        y = parent[y.r][y.c];
+      }
+      return up.concat(down.reverse());
+    }
+
+    // Walk the bright tip back through carved corridors so a retreat is
+    // always visible, never a teleport. Returns false if the run ended.
+    async function moveHeadTo(from, to) {
+      const path = treePath(from, to);
+      let prev = from;
+      for (let i = 0; i < path.length; i++) {
+        const step = path[i];
+        grid[prev.r][prev.c].carveHead = false;
+        grid[prev.r][prev.c].carveTrail = true;
+        grid[step.r][step.c].carveHead = true;
+        updateCell(prev.r, prev.c);
+        updateCell(step.r, step.c);
+        prev = step;
+        // Long trips back speed up after the first few steps.
+        const beat = Math.max(6, growthDelay() * 0.45) / (i < 3 ? 1 : 3);
+        if (!(await pace(beat, myRunId))) return false;
+      }
+      return true;
+    }
+
+    const showGrowthMetrics = () => setMetrics({
+      progress: `${Math.min(100, Math.round(carvedTargets / totalTargets * 100))}%`,
+      explored: String(carvedTargets),
+      frontier: String(stack.length),
+      distance: '—',
+      shortest: '—'
+    });
 
     carved[0][0] = true;
     grid[0][0].carveHead = true;
     updateCell(0, 0);
 
     useAlgorithmMetricLabels();
-    setMetrics({
-      progress: `${Math.round(carvedTargets / totalTargets * 100)}%`,
-      explored: String(carvedTargets),
-      frontier: String(stack.length),
-      distance: '—',
-      shortest: '—'
-    });
+    showGrowthMetrics();
 
     setStatus('The maze is growing from the bright tip. Watch it branch and retreat.', 'Growing');
 
@@ -602,7 +807,7 @@
       await waitWhilePaused(myRunId);
       if (!running || myRunId !== runId) return;
 
-      const cur = stack[stack.length - 1];
+      let cur = stack[stack.length - 1];
 
       for (const row of grid) {
         for (const cell of row) {
@@ -612,62 +817,63 @@
       grid[cur.r][cur.c].carveHead = true;
       updateCell(cur.r, cur.c);
 
-      const choices = dirs
-        .map(([dr, dc]) => ({ r: cur.r + dr, c: cur.c + dc }))
-        .filter(n => inBounds(n) && !carved[n.r][n.c]);
+      let choices = uncarvedNeighbours(cur);
 
       if (!choices.length) {
-        grid[cur.r][cur.c].carveHead = false;
-        grid[cur.r][cur.c].carveTrail = true;
-        updateCell(cur.r, cur.c);
         stack.pop();
+        showGrowthMetrics();
 
         if (stack.length) {
-          const back = stack[stack.length - 1];
-          grid[back.r][back.c].carveHead = true;
-          updateCell(back.r, back.c);
+          if (!(await moveHeadTo(cur, stack[stack.length - 1]))) return;
+        } else {
+          grid[cur.r][cur.c].carveHead = false;
+          grid[cur.r][cur.c].carveTrail = true;
+          updateCell(cur.r, cur.c);
+          if (!(await pace(Math.max(6, growthDelay() * 0.45), myRunId))) return;
         }
-
-        setMetrics({
-          progress: `${Math.round(carvedTargets / totalTargets * 100)}%`,
-          explored: String(carvedTargets),
-          frontier: String(stack.length),
-          distance: '—',
-          shortest: '—'
-        });
-
-        if (!(await pace(Math.max(6, growthDelay() * 0.45), myRunId))) return;
         continue;
       }
 
-      const next = choices[Math.floor(Math.random() * choices.length)];
+      // Branches dial: sometimes leave this corridor for later and start a
+      // side path from a square carved a moment ago.
+      if (branchChance && stack.length > 1 && Math.random() < branchChance) {
+        const recent = stack.slice(Math.max(0, stack.length - 1 - BRANCH_WINDOW), stack.length - 1);
+        const options = recent.filter(p => uncarvedNeighbours(p).length);
+        if (options.length) {
+          const target = options[Math.floor(Math.random() * options.length)];
+          stack.splice(stack.indexOf(target), 1);
+          stack.push(target);
+          if (!(await moveHeadTo(cur, target))) return;
+          cur = target;
+          choices = uncarvedNeighbours(cur);
+        }
+      }
+
+      const next = pickNext(cur, choices);
 
       grid[cur.r][cur.c].carveHead = false;
       grid[cur.r][cur.c].carveTrail = true;
 
       setWall(edgeBetween(cur, next), false, { zap: true });
       carved[next.r][next.c] = true;
+      parent[next.r][next.c] = cur;
+      depth[next.r][next.c] = depth[cur.r][cur.c] + 1;
       grid[next.r][next.c].carveSpark = true;
       grid[next.r][next.c].carveHead = true;
       updateCell(cur.r, cur.c);
       updateCell(next.r, next.c);
 
-      stack.push({ r: next.r, c: next.c });
+      stack.push(next);
       carvedTargets++;
-
-      setMetrics({
-        progress: `${Math.min(100, Math.round(carvedTargets / totalTargets * 100))}%`,
-        explored: String(carvedTargets),
-        frontier: String(stack.length),
-        distance: '—',
-        shortest: '—'
-      });
+      showGrowthMetrics();
 
       if (!(await pace(growthDelay(), myRunId))) return;
 
       grid[next.r][next.c].carveSpark = false;
       updateCell(next.r, next.c);
     }
+
+    if (!(await addShortcuts(style.shortcuts, myRunId))) return;
 
     for (const row of grid) {
       for (const cell of row) {
@@ -1555,9 +1761,19 @@
     size = Number(sizeSelect.value);
     saveSettings();
     makeBlankGrid();
+    syncLevelUI();
   });
 
   speedSelect.addEventListener('change', saveSettings);
+
+  for (const btn of levelButtons) {
+    btn.addEventListener('click', () => applyLevel(btn.dataset.level));
+  }
+
+  for (const dial of Object.values(dials)) {
+    dial.addEventListener('input', syncLevelUI);
+    dial.addEventListener('change', saveSettings);
+  }
 
   buttons.draw.addEventListener('click', () => setMode('draw'));
   buttons.start.addEventListener('click', () => setMode('start'));
@@ -1624,6 +1840,7 @@
   }
 
   useAlgorithmMetricLabels();
+  syncLevelUI();
   makeBlankGrid();
   window.addEventListener('load', registerServiceWorker);
 })();

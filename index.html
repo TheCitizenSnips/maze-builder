@@ -56,6 +56,12 @@
         <section class="group-card">
           <div class="section-label">Maze</div>
 
+          <div class="segmented level-picker" role="group" aria-label="Level">
+            <button class="segment" data-level="easy" aria-pressed="false"><span>Easy</span></button>
+            <button class="segment active" data-level="medium" aria-pressed="true"><span>Medium</span></button>
+            <button class="segment" data-level="hard" aria-pressed="false"><span>Hard</span></button>
+          </div>
+
           <label class="row-control">
             <span>Size</span>
             <select id="sizeSelect" aria-label="Maze size">
@@ -65,6 +71,35 @@
               <option value="25">25 × 25</option>
             </select>
           </label>
+
+          <details id="styleDetails" class="style-details">
+            <summary class="row-control">
+              <span>Maze style</span>
+              <span class="style-summary"><span id="levelLabel">Medium</span><svg class="chevron" viewBox="0 0 12 12" aria-hidden="true"><path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            </summary>
+
+            <div class="style-dials">
+              <label class="dial">
+                <span class="dial-name">Twisty</span>
+                <input id="twistyDial" type="range" min="0" max="4" step="1" value="2" aria-label="Twisty: how often the corridors turn">
+                <span class="dial-ends"><span>Straight</span><span>Twisty</span></span>
+              </label>
+
+              <label class="dial">
+                <span class="dial-name">Shortcuts</span>
+                <input id="shortcutsDial" type="range" min="0" max="4" step="1" value="0" aria-label="Shortcuts: extra openings that make more than one way through">
+                <span class="dial-ends"><span>One way</span><span>Lots</span></span>
+              </label>
+
+              <label class="dial">
+                <span class="dial-name">Branches</span>
+                <input id="branchesDial" type="range" min="0" max="4" step="1" value="0" aria-label="Branches: few long dead ends, or many short side paths">
+                <span class="dial-ends"><span>Few, long</span><span>Many, short</span></span>
+              </label>
+
+              <p class="dial-note">Changes apply the next time you grow a maze.</p>
+            </div>
+          </details>
         </section>
 
         <section class="group-card">
