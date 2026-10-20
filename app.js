@@ -92,6 +92,8 @@
     // below asks for a reopen later instead.
     if (!pageUrl.searchParams.has(FRESH_PARAM) && navigator.onLine !== false) {
       pageUrl.searchParams.set(FRESH_PARAM, Date.now());
+      // The safety net in index.html leaves this reload to us.
+      window.mazeBuilderReloading = true;
       forgetOfflineCopy().then(() => location.replace(pageUrl.href));
     } else {
       console.warn('Maze Builder page is older than its script; missing:', missingIds.join(', ') || 'level picker');
@@ -1894,4 +1896,6 @@
   syncLevelUI();
   makeBlankGrid();
   window.addEventListener('load', registerServiceWorker);
+  // Tells the check in index.html that this script started properly.
+  window.mazeBuilderStarted = true;
 })();
