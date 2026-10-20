@@ -1247,3 +1247,450 @@ select:disabled {
     background: #fff;
   }
 }
+
+
+/* ---------- Learn sheets ---------- */
+
+/* Small ⓘ buttons sit beside a heading. The visible circle is small so it
+   stays out of the way; the touch area around it is a full 44px. */
+.info-button {
+  appearance: none;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  margin: -14px -12px -14px -6px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--blue);
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.info-button svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+  opacity: 0.85;
+  transition: transform 110ms ease, opacity 150ms ease;
+}
+
+.info-button:active svg { transform: scale(0.88); opacity: 1; }
+
+.section-label-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.section-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.section-title-row .info-button { margin: -10px 0; }
+.section-title-row .info-button svg { width: 22px; height: 22px; }
+
+.learn-list {
+  margin: 12px -16px -16px;
+  border-top: 0.5px solid var(--separator);
+}
+
+.learn-list .list-action {
+  width: 100%;
+  margin: 0;
+  padding: 0 16px;
+}
+
+.success-learn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--blue);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  min-height: 44px;
+  margin: -8px 0 8px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.success-learn svg {
+  width: 17px;
+  height: 17px;
+  fill: currentColor;
+}
+
+/* The sheet itself: a centred card on iPad, a sheet from the bottom on a
+   phone. Opened with showModal(), so it sits above everything, success
+   sheet included. */
+.info-sheet {
+  --tint: var(--indigo);
+  --tint-soft: rgba(88,86,214,0.10);
+  width: min(620px, calc(100% - 32px));
+  max-width: none;
+  max-height: min(860px, calc(100dvh - 48px));
+  margin: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 28px;
+  background: transparent;
+  color: var(--label);
+  overflow: visible;
+}
+
+.info-sheet[data-tint="cyan"] { --tint: #1a9fd9; --tint-soft: rgba(50,173,230,0.12); }
+.info-sheet[data-tint="green"] { --tint: #248a3d; --tint-soft: rgba(48,209,88,0.12); }
+
+.info-sheet[open] { display: flex; }
+
+.info-sheet::backdrop {
+  background: rgba(10,12,18,0.28);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.info-sheet[open]::backdrop { animation: successBackdropIn 220ms ease-out both; }
+
+.info-sheet-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: inherit;
+  overflow: hidden;
+  background: rgba(255,255,255,0.97);
+  box-shadow: 0 24px 80px rgba(0,0,0,0.22);
+  animation: infoSheetIn 380ms cubic-bezier(.2,.85,.3,1) both;
+}
+
+@keyframes infoSheetIn {
+  from { opacity: 0; transform: translateY(24px) scale(.97); }
+  to { opacity: 1; transform: none; }
+}
+
+.info-sheet-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 12px 14px 20px;
+  border-bottom: 0.5px solid var(--separator);
+}
+
+.info-sheet-icon {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: white;
+  background: var(--tint);
+}
+
+.info-sheet-icon svg {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
+}
+
+.info-sheet-header h2 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.2;
+  font-weight: 760;
+  letter-spacing: -0.02em;
+}
+
+.info-sheet-done {
+  appearance: none;
+  flex: none;
+  min-width: 64px;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 0;
+  background: transparent;
+  color: var(--blue);
+  font: inherit;
+  font-size: 17px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+/* Reading text: larger than the app chrome, with roomy lines for young
+   readers. */
+.info-sheet-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 18px 22px max(24px, env(safe-area-inset-bottom));
+  font-size: 17px;
+  line-height: 1.5;
+  outline: none;
+}
+
+.info-sheet-body h3 {
+  margin: 26px 0 10px;
+  font-size: 19px;
+  font-weight: 740;
+  letter-spacing: -0.01em;
+  scroll-margin-top: 12px;
+}
+
+.info-sheet-body p { margin: 0 0 12px; }
+
+.info-lead {
+  font-size: 19px;
+  line-height: 1.45;
+}
+
+.info-hint {
+  color: var(--secondary-label);
+  font-size: 15px;
+}
+
+.info-steps {
+  list-style: none;
+  counter-reset: step;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.info-steps li {
+  counter-increment: step;
+  position: relative;
+  padding-left: 42px;
+  min-height: 30px;
+}
+
+.info-steps li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: -1px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  font-weight: 760;
+  color: var(--tint);
+  background: var(--tint-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.info-checks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.info-checks li {
+  position: relative;
+  padding-left: 42px;
+}
+
+.info-checks li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  top: -1px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+  font-weight: 800;
+  color: #248a3d;
+  background: rgba(48,209,88,0.14);
+}
+
+.info-callout {
+  margin: 20px 0 0;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(88,86,214,0.08);
+}
+
+.info-callout p { margin: 0; }
+.info-callout-gold { background: rgba(255,214,10,0.18); }
+.info-callout-green { background: rgba(48,209,88,0.12); }
+
+.info-callout-label {
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--secondary-label);
+}
+
+.info-terms {
+  margin: 0 0 12px;
+  border-radius: 16px;
+  background: rgba(118,118,128,0.07);
+}
+
+.info-terms > div {
+  display: grid;
+  grid-template-columns: 7.2em 1fr;
+  gap: 12px;
+  padding: 11px 16px;
+  border-top: 0.5px solid var(--separator);
+}
+
+.info-terms > div:first-child { border-top: 0; }
+.info-terms dt { font-weight: 700; }
+.info-terms dd { margin: 0; }
+
+.info-colours {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.info-colours li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.info-colours .swatch {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  margin-top: 2px;
+}
+
+/* Little teaching pictures, drawn in the maze's own colours. */
+.info-diagram {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0 8px;
+}
+
+.info-diagram-two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.info-diagram figure {
+  margin: 0;
+  text-align: center;
+}
+
+.info-diagram-maze {
+  display: block;
+  width: 100%;
+  max-width: 150px;
+  height: auto;
+  margin: 0 auto;
+}
+
+.info-diagram figcaption {
+  margin-top: 6px;
+  color: var(--secondary-label);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.info-diagram-maze .d-path { fill: var(--path); }
+.info-diagram-maze .d-start { fill: var(--start); }
+.info-diagram-maze .d-end { fill: var(--end); }
+.info-diagram-maze .d-trail { fill: rgba(88,86,214,0.16); }
+.info-diagram-maze .d-explored { fill: var(--visited); }
+.info-diagram-maze .d-frontier { fill: var(--frontier); }
+.info-diagram-maze .d-wall { stroke: var(--wall); stroke-width: 2.2; stroke-linecap: round; }
+.info-diagram-maze .d-border { fill: none; stroke: var(--wall); stroke-width: 3; }
+.info-diagram-maze .d-gold { fill: none; stroke: #f5c400; stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; opacity: 0.9; }
+.info-diagram-maze .d-head { fill: rgba(50,173,230,0.35); stroke: var(--cyan); stroke-width: 2.5; }
+.info-diagram-maze text {
+  font-size: 11px;
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: central;
+  font-family: inherit;
+}
+.info-diagram-maze .d-num { fill: rgba(28,43,79,0.75); font-variant-numeric: tabular-nums; }
+.info-diagram-maze .d-letter { fill: var(--wall); font-weight: 800; }
+
+.info-next {
+  appearance: none;
+  width: 100%;
+  margin-top: 26px;
+  padding: 12px 16px;
+  min-height: 60px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--tint-soft);
+  color: var(--label);
+  font: inherit;
+  font-size: 17px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+  cursor: pointer;
+}
+
+.info-next small {
+  display: block;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--secondary-label);
+}
+
+.info-next:active { filter: brightness(0.95); }
+
+/* Stop the page behind an open sheet from scrolling along with it. */
+html.info-open,
+html.info-open body { overflow: hidden; }
+
+@media (max-width: 560px) {
+  .info-sheet {
+    width: 100%;
+    max-height: calc(100dvh - max(28px, env(safe-area-inset-top)));
+    margin: auto 0 0;
+    border-radius: 24px 24px 0 0;
+  }
+
+  .info-sheet-body { padding-left: 18px; padding-right: 18px; }
+  .info-diagram { gap: 8px; }
+  .info-terms > div { grid-template-columns: 1fr; gap: 2px; }
+}
+
+@media print {
+  .info-button,
+  .info-sheet,
+  .learn-list {
+    display: none !important;
+  }
+}

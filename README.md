@@ -56,6 +56,16 @@ When the route reaches the finish:
 
 A 100% result means the player matched the mathematically shortest route.
 
+## Learn how it works
+
+Small ⓘ buttons open reading sheets written for children under 12:
+
+- **How a maze grows**: the depth-first carve, backtracking, the Maze style dials and the checks that make every maze real (ⓘ by Maze)
+- **How the search finds the way**: the breadth-first search wave and why the gold path is shortest (ⓘ by Animate)
+- **Solve it yourself**: how to play and how the score works (also linked from the success sheet)
+
+The ⓘ by the maze title opens whichever sheet matches what the maze is doing. The sheets live in `index.html`; keep their wording in step with `app.js` when the generator, search or scoring changes.
+
 ## Existing animation modes
 
 This package still includes:
