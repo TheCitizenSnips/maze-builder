@@ -627,7 +627,7 @@ This is not a secondary debugging tool.
 
 It should feel like drawing through a physical maze with Apple Pencil.
 
-The interaction starts at `S` and ends at `E`.
+The interaction starts at `S` and ends at `F`.
 
 ---
 
@@ -812,7 +812,7 @@ The tone should be playful and encouraging.
 
 ## 32. Completing the maze should feel special
 
-Reaching `E` should not result in a plain alert or text message.
+Reaching `F` should not result in a plain alert or text message.
 
 The completion sequence should feel rewarding.
 
@@ -1170,7 +1170,7 @@ Update individual cells when practical.
 ### Blank maze
 
 - app loads
-- `S` and `E` are visible
+- `S` and `F` are visible
 - walls can be drawn and erased
 - start and finish can be moved
 
