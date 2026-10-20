@@ -2001,7 +2001,105 @@
 
   document.getElementById('clearSolutionBtn').addEventListener('click', clearSolution);
   document.getElementById('blankBtn').addEventListener('click', makeBlankGrid);
-  document.getElementById('printBtn').addEventListener('click', () => window.print());
+  document.getElementById('printBtn').addEventListener('click', printMaze);
+
+  // Safari's print dialog. An app added to the iPhone or iPad Home Screen has
+  // none: window.print() does nothing there, so it hands the share sheet a
+  // picture of the maze instead, and Print is one of the share sheet's rows.
+  function printMaze() {
+    if (navigator.standalone !== true) {
+      window.print();
+      return;
+    }
+    const file = new File([mazePicture()], 'maze.png', { type: 'image/png' });
+    if (!navigator.canShare || !navigator.canShare({ files: [file] })) {
+      setStatus('Printing needs Safari here. Open the maze in Safari, then tap Print.');
+      return;
+    }
+    navigator.share({ files: [file] }).catch(err => {
+      if (err.name !== 'AbortError') setStatus('The maze could not be shared for printing. Try again.');
+    });
+  }
+
+  // The maze as the printed page shows it: walls, S, E and the gold route on
+  // white, with no search colours. Drawn synchronously so the share sheet
+  // still opens from the tap.
+  function mazePicture() {
+    const cell = 64;
+    const border = Math.round(cell * 0.18);
+    const inset = cell + border;
+    const side = size * cell;
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = side + 2 * inset;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.translate(inset, inset);
+
+    const isAt = (spot, r, c) => spot && spot.r === r && spot.c === c;
+    for (let r = 0; r < size; r++) {
+      for (let c = 0; c < size; c++) {
+        const fill = isAt(start, r, c) ? '#e8f8ef'
+          : isAt(end, r, c) ? '#ffecef'
+          : grid[r][c].solution ? '#ffd60a' : null;
+        if (fill) {
+          ctx.fillStyle = fill;
+          ctx.fillRect(c * cell, r * cell, cell, cell);
+        }
+      }
+    }
+
+    ctx.strokeStyle = '#ececf1';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = 1; i < size; i++) {
+      ctx.moveTo(i * cell, 0);
+      ctx.lineTo(i * cell, side);
+      ctx.moveTo(0, i * cell);
+      ctx.lineTo(side, i * cell);
+    }
+    ctx.stroke();
+
+    for (const [spot, ring, letter, ink] of [[start, '#30d158', 'S', '#248a3d'], [end, '#ff453a', 'E', '#d70015']]) {
+      if (!spot) continue;
+      const ringWidth = cell * 0.08;
+      ctx.strokeStyle = ring;
+      ctx.lineWidth = ringWidth;
+      ctx.strokeRect(spot.c * cell + ringWidth / 2, spot.r * cell + ringWidth / 2, cell - ringWidth, cell - ringWidth);
+      ctx.fillStyle = ink;
+      ctx.font = `800 ${Math.round(cell * 0.42)}px -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(letter, (spot.c + 0.5) * cell, (spot.r + 0.5) * cell);
+    }
+
+    ctx.strokeStyle = '#1c2b4f';
+    ctx.lineCap = 'square';
+    ctx.lineWidth = cell * 0.1;
+    ctx.beginPath();
+    for (let r = 0; r < size; r++) {
+      for (let c = 0; c < size; c++) {
+        if (walls.right[r] && walls.right[r][c]) {
+          ctx.moveTo((c + 1) * cell, r * cell);
+          ctx.lineTo((c + 1) * cell, (r + 1) * cell);
+        }
+        if (walls.bottom[r] && walls.bottom[r][c]) {
+          ctx.moveTo(c * cell, (r + 1) * cell);
+          ctx.lineTo((c + 1) * cell, (r + 1) * cell);
+        }
+      }
+    }
+    ctx.stroke();
+
+    ctx.lineCap = 'butt';
+    ctx.lineWidth = border;
+    ctx.strokeRect(-border / 2, -border / 2, side + border, side + border);
+
+    const bytes = atob(canvas.toDataURL('image/png').split(',')[1]);
+    const png = new Uint8Array(bytes.length);
+    for (let i = 0; i < bytes.length; i++) png[i] = bytes.charCodeAt(i);
+    return png;
+  }
 
   // The release shown next to the offline state: the commit's date and time
   // on this device's clock, then the short commit id that matches GitHub.

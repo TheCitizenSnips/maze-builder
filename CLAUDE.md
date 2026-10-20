@@ -994,6 +994,8 @@ Avoid printing translucent UI panels or app chrome.
 
 Human Pencil overlay is currently not intended to print by default unless explicitly requested.
 
+The printed maze scales to fill one page in either orientation. An app installed on the iOS Home Screen has no print dialog (`window.print()` does nothing there), so Print hands the share sheet a PNG of the maze instead, drawn from the maze state, and the share sheet's Print prints it. Keep the picture in step with the print stylesheet.
+
 ---
 
 # ACCESSIBILITY AND USABILITY

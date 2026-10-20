@@ -905,9 +905,17 @@ select:disabled {
     margin-bottom: 12pt;
   }
 
+  /* The maze fills the paper: as wide as the page, or as tall as the page
+     less the title, whichever is smaller, so every size prints on one page.
+     The inch cap keeps it inside Letter and A4 where a browser does not size
+     vw and vh to the paper; landscape paper is shorter, so its cap is too. */
   .maze-stage {
-    /* 7in fits inside Letter and A4 once the page margins are taken. */
-    --cell-size: min(0.32in, 7in / var(--grid-size));
+    --print-side: min(100vw, 100vh - 1in, 7in);
+    --cell-size: calc((var(--print-side) - 2 * var(--maze-border)) / var(--grid-size));
+  }
+
+  @media (orientation: landscape) {
+    .maze-stage { --print-side: min(100vw, 100vh - 1in, 6.2in); }
   }
 
   .wall-layer line.zap { animation: none !important; opacity: 0; }
