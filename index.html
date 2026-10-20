@@ -77,19 +77,6 @@
         </section>
 
 
-        <section class="group-card play-card">
-          <div class="section-label">Play</div>
-
-          <button id="userSolveBtn" class="ios-button play-button">
-            <svg><use href="#i-pencil"></use></svg>
-            <span>Solve It Yourself</span>
-          </button>
-
-          <div id="playHint" class="play-hint">
-            Use Apple Pencil or your finger. Start on <strong>S</strong> and trace through open corridors to <strong>E</strong>.
-          </div>
-        </section>
-
         <section class="group-card">
           <div class="section-label">Animate</div>
 
@@ -151,11 +138,17 @@
 
       <section class="content-panel">
         <div class="content-header">
-          <div>
+          <div class="content-heading">
             <div id="phaseLabel" class="phase-label">Ready</div>
             <div class="section-title">Interactive Maze</div>
             <div id="status" class="status-text">Tap “Grow a Maze” to watch one build itself.</div>
           </div>
+
+          <button id="userSolveBtn" class="ios-button play-button" aria-describedby="playHint">
+            <svg><use href="#i-pencil"></use></svg>
+            <span>Solve It Yourself</span>
+          </button>
+          <span id="playHint" class="sr-only">Use Apple Pencil or your finger. Start on S and trace through open corridors to E.</span>
         </div>
 
         <div class="telemetry" aria-live="polite">
