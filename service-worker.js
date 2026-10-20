@@ -70,7 +70,20 @@ async function networkFirst(request, { navigation = false } = {}) {
   try {
     // Revalidate against GitHub Pages whenever the device is online rather than
     // allowing the browser HTTP cache to hide a newly deployed app asset.
-    const response = await fetch(request, { cache: 'no-cache' });
+    // A page load is fetched by its address rather than by re-wrapping the
+    // browser's navigation request: Safari can refuse that, which left every
+    // refresh on the page saved at install while the scripts kept updating.
+    let response = navigation
+      ? await fetch(request.url, { cache: 'no-cache', credentials: 'same-origin' })
+      : await fetch(request, { cache: 'no-cache' });
+    // Safari will not show a page a worker answers with a redirected response.
+    if (navigation && response.redirected) {
+      response = new Response(await response.blob(), {
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers
+      });
+    }
     return await cacheResponse(request, response, shellKey);
   } catch (error) {
     const cached =

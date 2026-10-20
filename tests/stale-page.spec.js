@@ -62,4 +62,37 @@ test.describe('A page older than the script', () => {
     expect(requested.length).toBe(2);
     expect(errors).toEqual([]);
   });
+
+  test.describe('when the offline copy is stuck', () => {
+    test.use({ serviceWorkers: 'allow' });
+
+    // On an iPad the worker's page fetch kept failing, so every refresh got
+    // the page saved at install while app.js kept updating. Here the worker's
+    // page fetch is made to fail and an older page is put in its cache.
+    test('a refresh drops the stuck copy and loads the fresh page', async ({ page, context }) => {
+      const errors = collectErrors(page);
+      await page.goto('./');
+      await expect(page.locator('#offlineBadge')).toHaveText('Offline ready', { timeout: 15_000 });
+
+      await page.evaluate(async html => {
+        const cache = await caches.open('maze-builder-runtime');
+        const saved = () => new Response(html, { headers: { 'Content-Type': 'text/html' } });
+        await cache.put('./', saved());
+        await cache.put('./index.html', saved());
+      }, olderHtml);
+      await context.route(url => url.pathname.endsWith('/maze-builder/'), route =>
+        route.request().serviceWorker() ? route.abort() : route.continue());
+
+      await page.reload();
+      await expect(page.locator('#maze .cell')).toHaveCount(15 * 15);
+      await expect(page.locator('.level-picker .segment')).toHaveCount(3);
+      expect(new URL(page.url()).search).toBe('');
+      expect(errors).toEqual([]);
+
+      // With the network healthy again the worker comes back for offline use.
+      await context.unrouteAll();
+      await page.reload();
+      await expect(page.locator('#offlineBadge')).toHaveText(/Offline ready/, { timeout: 15_000 });
+    });
+  });
 });
