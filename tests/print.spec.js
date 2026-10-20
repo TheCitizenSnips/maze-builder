@@ -74,9 +74,21 @@ test.describe('Printing', () => {
     await page.setViewportSize({ width: 816, height: 1056 });
     await page.emulateMedia({ media: 'print' });
     const width = await page.locator('#maze').evaluate(el => el.getBoundingClientRect().width);
-    // As wide as the 25 × 25 maze: about 7in at 96 CSS px per inch.
-    expect(width).toBeGreaterThan(6.5 * 96);
-    expect(width).toBeLessThanOrEqual(7 * 96 + 1);
+    // As wide as the 25 × 25 maze: about 6in at 96 CSS px per inch.
+    expect(width).toBeGreaterThan(5.9 * 96);
+    expect(width).toBeLessThanOrEqual(6 * 96 + 1);
+  });
+
+  test('with Safari sizing the page from a portrait screen, the maze and title still fit landscape paper', async ({ page }) => {
+    // Safari takes vw, vh and orientation from the screen, so a portrait iPad
+    // printing on landscape Letter gets the portrait rules. The printable
+    // height there is about 6.8in once Safari adds its header and footer.
+    await openApp(page, { size: 25 });
+    await page.setViewportSize({ width: 820, height: 1180 });
+    await page.emulateMedia({ media: 'print' });
+    const bottom = await page.locator('#maze').evaluate(el => el.getBoundingClientRect().bottom);
+    const top = await page.locator('.section-title').evaluate(el => el.getBoundingClientRect().top);
+    expect(bottom - top).toBeLessThan(6.6 * 96);
   });
 
   test('Print opens the print dialog in the browser', async ({ page }) => {

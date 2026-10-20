@@ -901,21 +901,17 @@ select:disabled {
   }
 
   .section-title {
-    font-size: 26pt;
-    margin-bottom: 12pt;
+    font-size: 18pt;
+    margin-bottom: 8pt;
   }
 
-  /* The maze fills the paper: as wide as the page, or as tall as the page
-     less the title, whichever is smaller, so every size prints on one page.
-     The inch cap keeps it inside Letter and A4 where a browser does not size
-     vw and vh to the paper; landscape paper is shorter, so its cap is too. */
+  /* The maze fills the paper up to a 6in square, which with the title fits
+     one Letter or A4 page either way round, even under Safari's own header
+     and footer. Safari sizes vw, vh and orientation from the screen, not the
+     paper, so the inch cap is what keeps it on one page there. */
   .maze-stage {
-    --print-side: min(100vw, 100vh - 1in, 7in);
+    --print-side: min(100vw, 100vh - 1in, 6in);
     --cell-size: calc((var(--print-side) - 2 * var(--maze-border)) / var(--grid-size));
-  }
-
-  @media (orientation: landscape) {
-    .maze-stage { --print-side: min(100vw, 100vh - 1in, 6.2in); }
   }
 
   .wall-layer line.zap { animation: none !important; opacity: 0; }
