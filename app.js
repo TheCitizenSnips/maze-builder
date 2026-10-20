@@ -1,57 +1,89 @@
 (() => {
-  const mazeEl = document.getElementById('maze');
-  const wallLayer = document.getElementById('wallLayer');
-  const sizeSelect = document.getElementById('sizeSelect');
-  const speedSelect = document.getElementById('speedSelect');
-  const levelButtons = [...document.querySelectorAll('.level-picker .segment')];
-  const levelLabel = document.getElementById('levelLabel');
-  const dials = {
-    twisty: document.getElementById('twistyDial'),
-    shortcuts: document.getElementById('shortcutsDial'),
-    branches: document.getElementById('branchesDial')
+  // Every page element this script uses. A missing one means the page is from
+  // an older release than this script (a stale CDN copy, or the offline copy
+  // served after a network blip), so the app reloads for the fresh page
+  // instead of crashing with a blank maze.
+  const missingIds = [];
+  const byId = id => {
+    const el = document.getElementById(id);
+    if (!el) missingIds.push(id);
+    return el;
   };
-  const statusEl = document.getElementById('status');
-  const phaseLabel = document.getElementById('phaseLabel');
-  const pauseBtn = document.getElementById('pauseBtn');
-  const offlineBadge = document.getElementById('offlineBadge');
-  const offlineBadgeText = offlineBadge.querySelector('span');
 
-  const metricProgress = document.getElementById('metricProgress');
-  const metricExplored = document.getElementById('metricExplored');
-  const metricFrontier = document.getElementById('metricFrontier');
-  const metricDistance = document.getElementById('metricDistance');
-  const metricShortest = document.getElementById('metricShortest');
-  const metricLabel1 = document.getElementById('metricLabel1');
-  const metricLabel2 = document.getElementById('metricLabel2');
-  const metricLabel3 = document.getElementById('metricLabel3');
-  const metricLabel4 = document.getElementById('metricLabel4');
-  const metricLabel5 = document.getElementById('metricLabel5');
+  const mazeEl = byId('maze');
+  const wallLayer = byId('wallLayer');
+  const sizeSelect = byId('sizeSelect');
+  const speedSelect = byId('speedSelect');
+  const levelButtons = [...document.querySelectorAll('.level-picker .segment')];
+  const levelLabel = byId('levelLabel');
+  const dials = {
+    twisty: byId('twistyDial'),
+    shortcuts: byId('shortcutsDial'),
+    branches: byId('branchesDial')
+  };
+  const statusEl = byId('status');
+  const phaseLabel = byId('phaseLabel');
+  const pauseBtn = byId('pauseBtn');
+  const offlineBadge = byId('offlineBadge');
+  const offlineBadgeText = offlineBadge && offlineBadge.querySelector('span');
 
-  const userSolveBtn = document.getElementById('userSolveBtn');
-  const userSolveBtnLabel = userSolveBtn.querySelector('span');
-  const mazeStage = document.getElementById('mazeStage');
-  const userPathOverlay = document.getElementById('userPathOverlay');
-  const userPathGlow = document.getElementById('userPathGlow');
-  const userPathLine = document.getElementById('userPathLine');
-  const userPathHead = document.getElementById('userPathHead');
+  const metricProgress = byId('metricProgress');
+  const metricExplored = byId('metricExplored');
+  const metricFrontier = byId('metricFrontier');
+  const metricDistance = byId('metricDistance');
+  const metricShortest = byId('metricShortest');
+  const metricLabel1 = byId('metricLabel1');
+  const metricLabel2 = byId('metricLabel2');
+  const metricLabel3 = byId('metricLabel3');
+  const metricLabel4 = byId('metricLabel4');
+  const metricLabel5 = byId('metricLabel5');
 
-  const successSheet = document.getElementById('successSheet');
-  const successKicker = document.getElementById('successKicker');
-  const successTitle = document.getElementById('successTitle');
-  const successSubtitle = document.getElementById('successSubtitle');
-  const successTime = document.getElementById('successTime');
-  const successCells = document.getElementById('successCells');
-  const successBest = document.getElementById('successBest');
-  const successEfficiency = document.getElementById('successEfficiency');
-  const successAgainBtn = document.getElementById('successAgainBtn');
-  const successCloseBtn = document.getElementById('successCloseBtn');
-  const confettiField = document.getElementById('confettiField');
+  const userSolveBtn = byId('userSolveBtn');
+  const userSolveBtnLabel = userSolveBtn && userSolveBtn.querySelector('span');
+  const mazeStage = byId('mazeStage');
+  const userPathOverlay = byId('userPathOverlay');
+  const userPathGlow = byId('userPathGlow');
+  const userPathLine = byId('userPathLine');
+  const userPathHead = byId('userPathHead');
+
+  const successSheet = byId('successSheet');
+  const successKicker = byId('successKicker');
+  const successTitle = byId('successTitle');
+  const successSubtitle = byId('successSubtitle');
+  const successTime = byId('successTime');
+  const successCells = byId('successCells');
+  const successBest = byId('successBest');
+  const successEfficiency = byId('successEfficiency');
+  const successAgainBtn = byId('successAgainBtn');
+  const successCloseBtn = byId('successCloseBtn');
+  const confettiField = byId('confettiField');
 
   const buttons = {
-    draw: document.getElementById('drawBtn'),
-    start: document.getElementById('startBtn'),
-    end: document.getElementById('endBtn')
+    draw: byId('drawBtn'),
+    start: byId('startBtn'),
+    end: byId('endBtn')
   };
+
+  // The fresh page is fetched with a one-off query so neither the browser, the
+  // service worker nor the GitHub Pages CDN can answer with the old copy. The
+  // query also marks the retry, so a page that is still old (offline with
+  // mismatched copies) shows a message instead of reloading forever.
+  const FRESH_PARAM = 'fresh';
+  const pageUrl = new URL(location.href);
+  if (missingIds.length || !levelButtons.length) {
+    if (!pageUrl.searchParams.has(FRESH_PARAM)) {
+      pageUrl.searchParams.set(FRESH_PARAM, Date.now());
+      location.replace(pageUrl.href);
+    } else {
+      console.warn('Maze Builder page is older than its script; missing:', missingIds.join(', ') || 'level picker');
+      if (statusEl) statusEl.textContent = 'Maze Builder just updated. Close it and open it again to finish.';
+    }
+    return;
+  }
+  if (pageUrl.searchParams.has(FRESH_PARAM)) {
+    pageUrl.searchParams.delete(FRESH_PARAM);
+    history.replaceState(history.state, '', pageUrl.href);
+  }
 
   // Settings a child picked last time (size, speed and maze style) come back
   // on the next visit. Only the choices are remembered, never the maze itself.
