@@ -184,6 +184,53 @@ test.describe('Solve It Yourself', () => {
     await expect(page.locator('#successKicker')).toHaveText('Great Solve');
   });
 
+  test('a finger wobbling on the line between two squares counts one step, not three', async ({ page }) => {
+    await enterSolveMode(page);
+    await traceCells(page, [{ r: 0, c: 0 }, { r: 0, c: 1 }], { pointer, keepDown: true });
+    expect(await metric(page, 2)).toBe('2');
+
+    // Rest on the edge between (0,1) and (0,2), wobbling a little either side.
+    const box = await page.locator('#maze .cell[data-r="0"][data-c="2"]').boundingBox();
+    const edgeX = box.x;
+    const y = box.y + box.height / 2;
+    const wobble = box.width * 0.12;
+    for (const dx of [-wobble, wobble, -wobble, wobble, -wobble, wobble]) {
+      await pointer.move(edgeX + dx, y);
+    }
+    // Then carry on into the middle of (0,2).
+    const mid = await cellCenter(page, 0, 2);
+    await pointer.move(mid.x, mid.y);
+
+    expect(await userRoute(page)).toEqual([{ r: 0, c: 0 }, { r: 0, c: 1 }, { r: 0, c: 2 }]);
+    expect(await metric(page, 2)).toBe('3');
+    expect(await metric(page, 5)).toBe('0');
+    await pointer.up();
+  });
+
+  test('a line drawn close to the side of a corridor counts each square once', async ({ page }) => {
+    await enterSolveMode(page);
+    const start = await cellCenter(page, 0, 0);
+    const box = await page.locator('#maze .cell[data-r="0"][data-c="0"]').boundingBox();
+    // Run along the top row with the finger hugging, and sometimes just
+    // crossing, the line into the row below.
+    const edgeY = box.y + box.height;
+    await page.locator('#maze').scrollIntoViewIfNeeded();
+    await pointer.down(start.x, start.y);
+    const end = await cellCenter(page, 0, 5);
+    const steps = 40;
+    for (let i = 1; i <= steps; i++) {
+      const x = start.x + (end.x - start.x) * i / steps;
+      const y = edgeY + (i % 2 ? 1 : -1) * box.height * 0.1;
+      await pointer.move(x, y);
+    }
+    await pointer.move(end.x, end.y);
+
+    expect(await userRoute(page)).toEqual([0, 1, 2, 3, 4, 5].map(c => ({ r: 0, c })));
+    expect(await metric(page, 2)).toBe('6');
+    expect(await metric(page, 5)).toBe('0');
+    await pointer.up();
+  });
+
   test('the line cannot loop back through a square it already used', async ({ page }) => {
     await enterSolveMode(page);
     await traceCells(page, [
@@ -304,7 +351,10 @@ test.describe('Solve It Yourself', () => {
   test('leaving solve mode right after finishing never pops the result sheet later', async ({ page }) => {
     await enterSolveMode(page);
     await traceCells(page, blankRoute(11), { pointer });
-    await page.click('#userSolveBtn');
+    // Press Stop inside the short pause before the sheet appears. A plain
+    // page.click can take longer than that pause on a busy machine.
+    await page.evaluate(() => document.getElementById('userSolveBtn').click());
+    await expect(page.locator('#userSolveBtn')).toHaveText(/Solve It Yourself/);
     await page.waitForTimeout(900);
     await expect(page.locator('#successSheet')).toBeHidden();
   });

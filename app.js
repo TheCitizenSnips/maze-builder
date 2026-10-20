@@ -1679,6 +1679,27 @@
     if (now.r === via.r && now.c === via.c) addUserPathCell(next);
   }
 
+  // A finger or Pencil resting on the line between two squares wobbles back
+  // and forth across it. The line only leaves its end square once the pointer
+  // is this far (a fraction of a square) past the edge, judged separately
+  // across and along the corridor, so a wobble cannot count as stepping
+  // forward, back and forward again. E is exempt so the finish never needs a
+  // deeper reach.
+  const USER_EDGE_SLACK = 0.25;
+
+  function userTraceCell(x, y, geo) {
+    const cell = pointCell(x, y, geo);
+    const last = userPath[userPath.length - 1];
+    if (!cell || !last || (cell.r === end.r && cell.c === end.c)) return cell;
+
+    const hold = (inner, lastIndex, index) =>
+      inner >= lastIndex - USER_EDGE_SLACK && inner < lastIndex + 1 + USER_EDGE_SLACK ? lastIndex : index;
+    return {
+      r: hold((y - geo.top) / geo.cellH, last.r, cell.r),
+      c: hold((x - geo.left) / geo.cellW, last.c, cell.c)
+    };
+  }
+
   // Walk from the previous pointer sample to this one in quarter-cell steps so
   // a quick finger or Pencil flick cannot skip over a cell and stall the line.
   function traceUserPointTo(x, y) {
@@ -1691,7 +1712,7 @@
 
     for (let i = 1; i <= steps; i++) {
       if (!userTracing || userCompleted) break;
-      const cell = pointCell(from.x + dx * i / steps, from.y + dy * i / steps, geo);
+      const cell = userTraceCell(from.x + dx * i / steps, from.y + dy * i / steps, geo);
       if (cell) stepUserPathTo(cell);
     }
 
