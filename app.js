@@ -10,6 +10,18 @@
     return el;
   };
 
+  // Release stamp. On every deploy the GitHub Pages workflow replaces the
+  // placeholder here and in index.html with "<commit>|<commit time>", so the
+  // badge can say which release is running with no version to bump by hand.
+  // Local copies keep the placeholder and show no version.
+  const BUILD = '__MAZE_BUILD__';
+  const isStamped = build => /^[0-9a-f]{7,40}\|/.test(build);
+  const pageBuildMeta = document.querySelector('meta[name="maze-build"]');
+  const pageBuild = pageBuildMeta ? pageBuildMeta.content : '';
+  // A stamped page and script from different releases are a mix of old and
+  // new copies, even when every element happens to be present.
+  const mixedReleases = isStamped(BUILD) && isStamped(pageBuild) && BUILD !== pageBuild;
+
   const mazeEl = byId('maze');
   const wallLayer = byId('wallLayer');
   const sizeSelect = byId('sizeSelect');
@@ -87,16 +99,18 @@
   // shows a message instead of reloading forever.
   const FRESH_PARAM = 'fresh';
   const pageUrl = new URL(location.href);
-  if (missingIds.length || !levelButtons.length) {
+  if (missingIds.length || !levelButtons.length || mixedReleases) {
     // Offline, the saved copy is all there is, so it is kept and the message
     // below asks for a reopen later instead.
     if (!pageUrl.searchParams.has(FRESH_PARAM) && navigator.onLine !== false) {
       pageUrl.searchParams.set(FRESH_PARAM, Date.now());
       // The safety net in index.html leaves this reload to us.
       window.mazeBuilderReloading = true;
+      if (offlineBadgeText) offlineBadgeText.textContent = 'Updating…';
       forgetOfflineCopy().then(() => location.replace(pageUrl.href));
     } else {
-      console.warn('Maze Builder page is older than its script; missing:', missingIds.join(', ') || 'level picker');
+      console.warn('Maze Builder page and script are from different releases; missing:',
+        missingIds.join(', ') || (mixedReleases ? `none (page ${pageBuild}, script ${BUILD})` : 'level picker'));
       if (statusEl) statusEl.textContent = 'Maze Builder just updated. Close it and open it again to finish.';
     }
     return;
@@ -1989,6 +2003,35 @@
   document.getElementById('blankBtn').addEventListener('click', makeBlankGrid);
   document.getElementById('printBtn').addEventListener('click', () => window.print());
 
+  // The release shown next to the offline state: the commit's date and time
+  // on this device's clock, then the short commit id that matches GitHub.
+  // A phone shows the date only so the badge stays on one line.
+  function showRelease() {
+    if (!isStamped(BUILD)) return;
+    const [commit, time] = BUILD.split('|');
+    const when = new Date(time);
+    const known = !Number.isNaN(when.getTime());
+    const date = known ? when.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
+    const clock = known ? when.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '';
+
+    const label = document.createElement('span');
+    label.className = 'release-label';
+    if (known) {
+      const whenEl = document.createElement('span');
+      const clockEl = document.createElement('span');
+      clockEl.className = 'release-time';
+      clockEl.textContent = ` ${clock}`;
+      whenEl.append(date, clockEl);
+      label.append(whenEl);
+    }
+    const commitEl = document.createElement('span');
+    commitEl.className = 'release-commit';
+    commitEl.textContent = commit;
+    label.append(commitEl);
+    offlineBadge.append(label);
+    offlineBadge.title = `Version ${commit}${known ? `, released ${date} ${clock}` : ''}`;
+  }
+
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) {
       offlineBadgeText.textContent = 'Web only';
@@ -2017,6 +2060,7 @@
   }
 
   useAlgorithmMetricLabels();
+  showRelease();
   syncLevelUI();
   makeBlankGrid();
   window.addEventListener('load', registerServiceWorker);

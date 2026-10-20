@@ -100,6 +100,8 @@ button { -webkit-tap-highlight-color: transparent; }
 
 .status-chip {
   display: inline-flex;
+  flex-shrink: 0;
+  white-space: nowrap;
   align-items: center;
   gap: 6px;
   min-height: 34px;
@@ -115,6 +117,20 @@ button { -webkit-tap-highlight-color: transparent; }
 }
 
 .status-chip.ready { color: #248a3d; }
+
+.release-label {
+  display: inline-flex;
+  white-space: nowrap;
+  gap: 6px;
+  color: var(--secondary-label);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.release-label > span::before {
+  content: "·";
+  margin-right: 6px;
+}
 
 .status-chip svg {
   width: 14px;
@@ -809,6 +825,9 @@ select:disabled {
 }
 
 @media (max-width: 560px) {
+  .release-commit,
+  .release-time { display: none; }
+
   .status-text { min-height: calc(3em * 1.35); }
 
   /* On a phone the button gets its own full-width row under the title. */
