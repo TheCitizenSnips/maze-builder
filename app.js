@@ -64,16 +64,35 @@
     end: byId('endBtn')
   };
 
-  // The fresh page is fetched with a one-off query so neither the browser, the
-  // service worker nor the GitHub Pages CDN can answer with the old copy. The
-  // query also marks the retry, so a page that is still old (offline with
-  // mismatched copies) shows a message instead of reloading forever.
+  // Before reloading, the offline copy is dropped: this app's service worker
+  // is unregistered and its cache deleted, so the reload goes straight to the
+  // network like a first visit, whatever the worker on this device does. The
+  // app registers the worker again once the fresh page has loaded. Only Maze
+  // Builder's own worker and cache are touched, since both are origin-wide.
+  function forgetOfflineCopy() {
+    const work = [];
+    const scope = new URL('./', location.href).href;
+    if ('serviceWorker' in navigator) {
+      work.push(navigator.serviceWorker.getRegistrations().then(registrations =>
+        Promise.all(registrations.filter(r => r.scope === scope).map(r => r.unregister()))));
+    }
+    if (window.caches) work.push(caches.delete('maze-builder-runtime'));
+    const giveUp = new Promise(resolve => setTimeout(resolve, 3000));
+    return Promise.race([Promise.all(work), giveUp]).catch(() => {});
+  }
+
+  // The fresh page is fetched with a one-off query so neither the browser nor
+  // the GitHub Pages CDN can answer with the old copy. The query also marks
+  // the retry, so a page that is still old (offline with mismatched copies)
+  // shows a message instead of reloading forever.
   const FRESH_PARAM = 'fresh';
   const pageUrl = new URL(location.href);
   if (missingIds.length || !levelButtons.length) {
-    if (!pageUrl.searchParams.has(FRESH_PARAM)) {
+    // Offline, the saved copy is all there is, so it is kept and the message
+    // below asks for a reopen later instead.
+    if (!pageUrl.searchParams.has(FRESH_PARAM) && navigator.onLine !== false) {
       pageUrl.searchParams.set(FRESH_PARAM, Date.now());
-      location.replace(pageUrl.href);
+      forgetOfflineCopy().then(() => location.replace(pageUrl.href));
     } else {
       console.warn('Maze Builder page is older than its script; missing:', missingIds.join(', ') || 'level picker');
       if (statusEl) statusEl.textContent = 'Maze Builder just updated. Close it and open it again to finish.';

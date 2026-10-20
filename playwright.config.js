@@ -3,6 +3,9 @@ const { defineConfig, devices } = require('@playwright/test');
 
 const PORT = Number(process.env.PORT || 4173);
 
+// Lets tests see and route the service worker's own fetches (Chromium).
+process.env.PW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTS = '1';
+
 // Chromium runs by default (desktop mouse, plus iPad- and iPhone-sized touch
 // screens). Set PW_WEBKIT=1 (npm run test:webkit) to add Safari's engine;
 // install it once with `npx playwright install webkit`.
