@@ -89,7 +89,7 @@ function cellsWithClass(maze, cls) {
 
 const DIRS = [[1, 0], [0, 1], [-1, 0], [0, -1]];
 
-/** Independent BFS used to check the app's answers. Returns cells S..E or null. */
+/** Independent BFS used to check the app's answers. Returns cells S..F or null. */
 function shortestPath(maze, from = maze.start, to = maze.end) {
   const k = p => `${p.r},${p.c}`;
   const prev = new Map([[k(from), null]]);

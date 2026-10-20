@@ -4,7 +4,7 @@ const {
 } = require('./helpers');
 
 test.describe('Blank maze and editing', () => {
-  test('loads with a visible S and E in the corners and no errors', async ({ page }) => {
+  test('loads with a visible S and F in the corners and no errors', async ({ page }) => {
     const errors = await openApp(page);
     const maze = await readMaze(page);
 
@@ -14,6 +14,10 @@ test.describe('Blank maze and editing', () => {
     expect(wallCount(maze)).toBe(0);
     await expect(cell(page, 0, 0)).toBeVisible();
     await expect(cell(page, 14, 14)).toBeVisible();
+    // The markers spell Start and Finish, matching the buttons and legend.
+    const marker = (r, c) => cell(page, r, c).evaluate(el => getComputedStyle(el, '::after').content);
+    expect(await marker(0, 0)).toBe('"S"');
+    expect(await marker(14, 14)).toBe('"F"');
     await expect(page.locator('#phaseLabel')).toHaveText('Ready');
     expect(errors).toEqual([]);
   });
@@ -226,7 +230,7 @@ test.describe('Blank maze and editing', () => {
     expect(maze.start).toEqual({ r: 5, c: 5 });
   });
 
-  test('S and E can never share a square', async ({ page }) => {
+  test('S and F can never share a square', async ({ page }) => {
     await openApp(page);
 
     await page.click('#endBtn');
@@ -261,7 +265,7 @@ test.describe('Blank maze and editing', () => {
     await expect(page.locator('#status')).toContainText('old search was cleared');
   });
 
-  test('Blank Grid wipes walls and restores S and E', async ({ page }) => {
+  test('Blank Grid wipes walls and restores S and F', async ({ page }) => {
     await openApp(page);
     await toggleWall(page, 2, 2, 'bottom');
     await page.click('#startBtn');

@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const { openApp, readMaze, growMaze, shortestPath, cellsWithClass, toggleWall, metric, cell, blocked, watchMazeStillness } = require('./helpers');
 
-/** Gold cells must form one unbroken S→E corridor walk of the true shortest length. */
+/** Gold cells must form one unbroken S→F corridor walk of the true shortest length. */
 function expectGoldIsShortest(maze) {
   const gold = cellsWithClass(maze, 'solution');
   const expected = shortestPath(maze);
@@ -26,7 +26,7 @@ function expectGoldIsShortest(maze) {
   expect(walked.size).toBe(gold.length);
 }
 
-/** Wall off E (the bottom-right corner) completely on a blank 11 × 11 grid. */
+/** Wall off F (the bottom-right corner) completely on a blank 11 × 11 grid. */
 async function boxInFinish(page) {
   await toggleWall(page, 10, 9, 'right');
   await toggleWall(page, 9, 10, 'bottom');
@@ -119,7 +119,7 @@ test.describe('Computer path discovery', () => {
     await page.locator('#maze .cell[data-r="0"][data-c="0"]').click();
     await page.click('#instantBtn');
     const maze = await readMaze(page);
-    // S and E are neighbours, but the wall between them means going all the way round.
+    // S and F are neighbours, but the wall between them means going all the way round.
     expectGoldIsShortest(maze);
     expect(cellsWithClass(maze, 'solution')).toHaveLength(1 + 10 + 1 + 10);
   });

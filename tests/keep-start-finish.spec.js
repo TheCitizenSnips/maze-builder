@@ -12,7 +12,7 @@ async function placeMarkers(page, s, e) {
 }
 
 test.describe('Growing keeps a moved Start and Finish', () => {
-  test('S and E stay where they were put, and the maze is still valid', async ({ page }) => {
+  test('S and F stay where they were put, and the maze is still valid', async ({ page }) => {
     const errors = await openApp(page, { size: 15 });
     const s = { r: 3, c: 11 };
     const e = { r: 12, c: 2 };
@@ -28,7 +28,7 @@ test.describe('Growing keeps a moved Start and Finish', () => {
     expect(errors).toEqual([]);
   });
 
-  test('S and E side by side still give a long route, not a short hop', async ({ page }) => {
+  test('S and F side by side still give a long route, not a short hop', async ({ page }) => {
     const errors = await openApp(page, { size: 15 });
     const s = { r: 7, c: 7 };
     const e = { r: 7, c: 8 };
@@ -66,7 +66,7 @@ test.describe('Growing keeps a moved Start and Finish', () => {
     expect(errors).toEqual([]);
   });
 
-  test('changing the size puts S and E back in the corners', async ({ page }) => {
+  test('changing the size puts S and F back in the corners', async ({ page }) => {
     await openApp(page, { size: 15 });
     await placeMarkers(page, { r: 7, c: 7 }, { r: 7, c: 8 });
     await page.selectOption('#sizeSelect', '11');

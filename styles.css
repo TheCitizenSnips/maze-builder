@@ -795,7 +795,7 @@ select:disabled {
 }
 
 .cell.start::after { content: "S"; color: #248a3d; }
-.cell.end::after { content: "E"; color: #d70015; }
+.cell.end::after { content: "F"; color: #d70015; }
 
 @media (prefers-reduced-motion: reduce) {
   *,

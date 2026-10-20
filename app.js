@@ -1514,7 +1514,7 @@
     userOptimalCells = shortestPathCellCount();
 
     if (!userOptimalCells) {
-      setStatus('This maze has no valid route from S to E. Generate a new maze or edit this one first.', 'No Path');
+      setStatus('This maze has no valid route from S to F. Generate a new maze or edit this one first.', 'No Path');
       return;
     }
 
@@ -1531,7 +1531,7 @@
     userSolveBtn.disabled = false;
     bringMazeIntoView();
 
-    setStatus('Touch S with Apple Pencil or your finger, then trace through the corridors to E.', 'Your Turn');
+    setStatus('Touch S with Apple Pencil or your finger, then trace through the corridors to F.', 'Your Turn');
   }
 
   function exitUserSolveMode(updateStatus = true) {
@@ -1750,7 +1750,7 @@
     syncUserOverlay();
     updateUserMetrics();
 
-    setStatus(`Tracing with ${toolLabel(e)}. Stay in the open corridors and reach E.`, 'Tracing');
+    setStatus(`Tracing with ${toolLabel(e)}. Stay in the open corridors and reach F.`, 'Tracing');
   }
 
   function endUserTrace(e) {
@@ -1789,7 +1789,7 @@
     startUserTimer(userPausedElapsedMs);
     traceUserPointTo(e.clientX, e.clientY);
 
-    setStatus(`Tracing with ${toolLabel(e)}. Keep going to E.`, 'Tracing');
+    setStatus(`Tracing with ${toolLabel(e)}. Keep going to F.`, 'Tracing');
     return true;
   }
 
