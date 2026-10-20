@@ -362,6 +362,14 @@ select:disabled {
 
 .content-header {
   margin-bottom: 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.content-heading {
+  flex: 1;
+  min-width: 0;
 }
 
 .section-title {
@@ -729,6 +737,10 @@ select:disabled {
 
 @media (max-width: 560px) {
   .status-text { min-height: calc(3em * 1.35); }
+
+  /* On a phone the button gets its own full-width row under the title. */
+  .content-header { flex-direction: column; align-items: stretch; gap: 10px; }
+  .play-button { width: 100%; margin-top: 0; }
 }
 
 @media (max-width: 720px) {
@@ -776,6 +788,7 @@ select:disabled {
   .phase-label,
   .telemetry,
   .legend,
+  #userSolveBtn,
   #offlineBadge {
     display: none !important;
   }
@@ -845,11 +858,12 @@ select:disabled {
 
 /* ---------- User solve mode ---------- */
 
-.play-card {
-  background: linear-gradient(180deg, rgba(48,209,88,0.085), rgba(255,255,255,0.88));
-}
-
+/* Play sits beside the maze title, right above where the child draws. */
 .play-button {
+  flex: none;
+  width: auto;
+  padding: 0 18px;
+  margin-top: 4px;
   color: white;
   background: #34c759;
   box-shadow: 0 8px 20px rgba(52,199,89,0.18);
@@ -858,13 +872,6 @@ select:disabled {
 .play-button.active {
   background: #248a3d;
   box-shadow: 0 0 0 3px rgba(52,199,89,0.14), 0 8px 20px rgba(52,199,89,0.18);
-}
-
-.play-hint {
-  margin-top: 9px;
-  color: var(--secondary-label);
-  font-size: 12px;
-  line-height: 1.4;
 }
 
 .maze-stage {

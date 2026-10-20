@@ -46,6 +46,39 @@
     end: document.getElementById('endBtn')
   };
 
+  // Settings a child picked last time (size and speed) come back on the next
+  // visit. Only the choices are remembered, never the maze itself. Storage can
+  // be missing or blocked (private browsing), so every access is guarded.
+  const SETTINGS_KEY = 'mazeBuilder.settings';
+  const rememberedSelects = { size: sizeSelect, speed: speedSelect };
+
+  function restoreSettings() {
+    let saved = null;
+    try {
+      saved = JSON.parse(localStorage.getItem(SETTINGS_KEY));
+    } catch (error) {
+      return;
+    }
+    if (!saved || typeof saved !== 'object') return;
+
+    for (const [key, select] of Object.entries(rememberedSelects)) {
+      const value = String(saved[key]);
+      if ([...select.options].some(option => option.value === value)) select.value = value;
+    }
+  }
+
+  function saveSettings() {
+    const settings = {};
+    for (const [key, select] of Object.entries(rememberedSelects)) settings[key] = select.value;
+    try {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    } catch (error) {
+      // Not saved this time; the app works the same without it.
+    }
+  }
+
+  restoreSettings();
+
   let size = Number(sizeSelect.value);
   let grid = [];
   let walls = { right: [], bottom: [] };
@@ -1520,8 +1553,11 @@
 
   sizeSelect.addEventListener('change', () => {
     size = Number(sizeSelect.value);
+    saveSettings();
     makeBlankGrid();
   });
+
+  speedSelect.addEventListener('change', saveSettings);
 
   buttons.draw.addEventListener('click', () => setMode('draw'));
   buttons.start.addEventListener('click', () => setMode('start'));
