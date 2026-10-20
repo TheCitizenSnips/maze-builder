@@ -2060,8 +2060,11 @@
     }
     ctx.stroke();
 
-    for (const [spot, ring, letter, ink] of [[start, '#30d158', 'S', '#248a3d'], [end, '#ff453a', 'E', '#d70015']]) {
+    for (const [spot, ring, fallback, ink] of [[start, '#30d158', 'S', '#248a3d'], [end, '#ff453a', 'E', '#d70015']]) {
       if (!spot) continue;
+      // The same letter the grid shows, so the picture follows any rename.
+      const shown = getComputedStyle(mazeEl.children[spot.r * size + spot.c], '::after').content;
+      const letter = /^"(.+)"$/.test(shown) ? shown.slice(1, -1) : fallback;
       const ringWidth = cell * 0.08;
       ctx.strokeStyle = ring;
       ctx.lineWidth = ringWidth;

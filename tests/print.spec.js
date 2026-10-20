@@ -144,6 +144,30 @@ test.describe('Printing', () => {
     expect(picture.start).toBe('232,248,239');
   });
 
+  test('the picture labels Start and Finish with the letters the grid shows', async ({ page }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'standalone', { value: true });
+      navigator.canShare = () => true;
+      navigator.share = async data => { window.shared = data; };
+      const texts = [];
+      const fillText = CanvasRenderingContext2D.prototype.fillText;
+      CanvasRenderingContext2D.prototype.fillText = function (text, ...rest) {
+        texts.push(text);
+        return fillText.call(this, text, ...rest);
+      };
+      window.pictureTexts = texts;
+    });
+    await openApp(page, { size: 11 });
+    await page.click('#printBtn');
+    await page.waitForFunction(() => window.shared);
+    const { drawn, shown } = await page.evaluate(() => ({
+      drawn: window.pictureTexts,
+      shown: ['.start', '.end'].map(sel =>
+        getComputedStyle(document.querySelector(`#maze .cell${sel}`), '::after').content.replace(/"/g, ''))
+    }));
+    expect(drawn).toEqual(shown);
+  });
+
   test('in a Home Screen app that cannot share files, Print explains where to print', async ({ page }) => {
     await page.addInitScript(() => {
       Object.defineProperty(navigator, 'standalone', { value: true });
