@@ -265,6 +265,22 @@
     return currentDelay() * Math.min(1, Math.sqrt(121 / (size * size)));
   }
 
+  // On a phone or portrait iPad the controls sit above the maze, so the
+  // button a child just tapped can leave the maze below the screen. When
+  // the maze starts growing or being solved, scroll it into view; leave the
+  // page alone when it is already fully visible.
+  function bringMazeIntoView() {
+    const box = mazeEl.getBoundingClientRect();
+    const viewHeight = window.innerHeight || document.documentElement.clientHeight;
+    if (box.top >= 0 && box.bottom <= viewHeight) return;
+    const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    mazeEl.scrollIntoView({
+      behavior: reduceMotion ? 'auto' : 'smooth',
+      // Show the status line above the maze too when there is room.
+      block: box.height <= viewHeight ? 'end' : 'start'
+    });
+  }
+
   function cancelAnimation() {
     runId++;
     running = false;
@@ -691,104 +707,63 @@
   window.addEventListener('pointerup', endDrawStroke);
   window.addEventListener('pointercancel', endDrawStroke);
 
-  // Shortcuts dial: once the maze is a single-route tree, open a few extra
-  // walls so there is more than one way through. Each one opens a dead end
-  // where possible, so a wrong turn is less of a trap.
-  async function addShortcuts(level, myRunId) {
-    const count = Math.round(SHORTCUT_SHARE[level] * size * size);
-    if (!count) return true;
-
-    setStatus('Adding shortcuts, so there is more than one way through.', 'Growing');
-    const steps = [{ r: 1, c: 0 }, { r: -1, c: 0 }, { r: 0, c: 1 }, { r: 0, c: -1 }];
-    const neighbours = p => steps.map(d => ({ r: p.r + d.r, c: p.c + d.c })).filter(inBounds);
-    const pick = list => list[Math.floor(Math.random() * list.length)];
-
-    for (let i = 0; i < count; i++) {
-      const deadEnds = [];
-      const walled = [];
-      for (let r = 0; r < size; r++) {
-        for (let c = 0; c < size; c++) {
-          const p = { r, c };
-          const closed = neighbours(p).filter(n => !canMove(p, n));
-          if (neighbours(p).length - closed.length === 1 && closed.length) deadEnds.push({ p, closed });
-          for (const n of closed) if (n.r > r || n.c > c) walled.push({ a: p, b: n });
-        }
-      }
-      if (!walled.length) break;
-
-      let a;
-      let b;
-      if (deadEnds.length) {
-        const dead = pick(deadEnds);
-        a = dead.p;
-        b = pick(dead.closed);
-      } else {
-        ({ a, b } = pick(walled));
-      }
-
-      setWall(edgeBetween(a, b), false, { zap: true });
-      for (const p of [a, b]) {
-        grid[p.r][p.c].carveSpark = true;
-        updateCell(p.r, p.c);
-      }
-      if (!(await pace(growthDelay() * 2.5, myRunId))) return false;
-      for (const p of [a, b]) {
-        grid[p.r][p.c].carveSpark = false;
-        updateCell(p.r, p.c);
-      }
-    }
-    return true;
-  }
-
-  async function animateMazeGrowth() {
-    exitUserSolveMode(false);
-    cancelAnimation();
-
-    const myRunId = runId;
-    running = true;
-    paused = false;
-    runType = 'generate';
-    pauseBtn.disabled = false;
-    setInteractiveDisabled(true);
-
-    // Every edge starts as a wall; the generator knocks out one edge per
-    // step until each square is joined to the rest.
-    grid = Array.from({ length: size }, () =>
-      Array.from({ length: size }, () => createCellState())
-    );
-    walls = makeWalls(true);
-
-    start = { r: 0, c: 0 };
-    end = { r: size - 1, c: size - 1 };
-    render();
-
-    const style = mazeStyle();
+  // A grown maze is planned in full first, then the plan is played back as
+  // the growth animation. Planning first lets us check the finished maze
+  // (S and E wherever the child put them) and quietly try again when the
+  // route between them would be too short to be worth solving.
+  //
+  // The plan is a list of steps for the animation:
+  //   carve    the tip knocks out the wall from `from` into `to`
+  //   move     the tip travels back along carved corridors (`path`)
+  //   rest     the tip settles at `at` once every square is joined
+  //   shortcut the Shortcuts dial opens the wall between `a` and `b`
+  // Each carve, move and rest step also records the carved count and stack
+  // depth at that moment, for the live telemetry.
+  function planMaze(n, style, from, to, minRoute = 0, { giveUpWhenShort = false } = {}) {
     const straightWeight = STRAIGHT_WEIGHT[style.twisty];
     const branchChance = BRANCH_CHANCE[style.branches];
+    const steps = [];
+    const plan = {
+      right: Array.from({ length: n }, () => Array(n - 1).fill(true)),
+      bottom: Array.from({ length: n - 1 }, () => Array(n).fill(true))
+    };
+    const inside = p => p.r >= 0 && p.c >= 0 && p.r < n && p.c < n;
+    const near = p => [[1,0],[-1,0],[0,1],[0,-1]]
+      .map(([dr, dc]) => ({ r: p.r + dr, c: p.c + dc }))
+      .filter(inside);
+    const same = (a, b) => a.r === b.r && a.c === b.c;
+    // When S and E sit side by side, the wall between them always stays up,
+    // so the route has to go the long way round.
+    const direct = (a, b) => (same(a, from) && same(b, to)) || (same(a, to) && same(b, from));
+    const isOpen = (a, b) => {
+      const edge = edgeBetween(a, b);
+      return !plan[edge.side][edge.r][edge.c];
+    };
+    const knock = (a, b) => {
+      const edge = edgeBetween(a, b);
+      plan[edge.side][edge.r][edge.c] = false;
+    };
 
-    const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
-    const carved = Array.from({ length: size }, () => Array(size).fill(false));
+    const carved = Array.from({ length: n }, () => Array(n).fill(false));
     // The carved squares form a tree: parent and depth let the tip travel
     // back along real corridors when it retreats or starts a side path.
-    const parent = Array.from({ length: size }, () => Array(size).fill(null));
-    const depth = Array.from({ length: size }, () => Array(size).fill(0));
+    const parent = Array.from({ length: n }, () => Array(n).fill(null));
+    const depth = Array.from({ length: n }, () => Array(n).fill(0));
     // Squares that may still have uncarved neighbours. With Branches at its
     // lowest this is exactly the depth-first stack.
-    const stack = [{ r: 0, c: 0 }];
-    const totalTargets = size * size;
-    let carvedTargets = 1;
+    const stack = [from];
+    let carvedCount = 1;
+    carved[from.r][from.c] = true;
 
-    const uncarvedNeighbours = p => dirs
-      .map(([dr, dc]) => ({ r: p.r + dr, c: p.c + dc }))
-      .filter(n => inBounds(n) && !carved[n.r][n.c]);
+    const uncarvedNeighbours = p => near(p).filter(q => !carved[q.r][q.c] && !direct(p, q));
 
     // Pick the next square, weighting the one straight ahead by the Twisty
     // dial. A weight of 1 is a plain random choice.
     function pickNext(cur, choices) {
-      const from = parent[cur.r][cur.c];
-      const weights = choices.map(n => {
-        if (!from) return 1;
-        const straight = n.r - cur.r === cur.r - from.r && n.c - cur.c === cur.c - from.c;
+      const back = parent[cur.r][cur.c];
+      const weights = choices.map(q => {
+        if (!back) return 1;
+        const straight = q.r - cur.r === cur.r - back.r && q.c - cur.c === cur.c - back.c;
         return straight ? straightWeight : 1;
       });
       let roll = Math.random() * weights.reduce((a, b) => a + b, 0);
@@ -807,7 +782,7 @@
       let y = b;
       while (depth[x.r][x.c] > depth[y.r][y.c]) { x = parent[x.r][x.c]; up.push(x); }
       while (depth[y.r][y.c] > depth[x.r][x.c]) { down.push(y); y = parent[y.r][y.c]; }
-      while (x.r !== y.r || x.c !== y.c) {
+      while (!same(x, y)) {
         x = parent[x.r][x.c];
         up.push(x);
         down.push(y);
@@ -816,71 +791,16 @@
       return up.concat(down.reverse());
     }
 
-    // Walk the bright tip back through carved corridors so a retreat is
-    // always visible, never a teleport. Returns false if the run ended.
-    async function moveHeadTo(from, to) {
-      const path = treePath(from, to);
-      let prev = from;
-      for (let i = 0; i < path.length; i++) {
-        const step = path[i];
-        grid[prev.r][prev.c].carveHead = false;
-        grid[prev.r][prev.c].carveTrail = true;
-        grid[step.r][step.c].carveHead = true;
-        updateCell(prev.r, prev.c);
-        updateCell(step.r, step.c);
-        prev = step;
-        // Long trips back speed up after the first few steps.
-        const beat = Math.max(6, growthDelay() * 0.45) / (i < 3 ? 1 : 3);
-        if (!(await pace(beat, myRunId))) return false;
-      }
-      return true;
-    }
-
-    const showGrowthMetrics = () => setMetrics({
-      progress: `${Math.min(100, Math.round(carvedTargets / totalTargets * 100))}%`,
-      explored: String(carvedTargets),
-      frontier: String(stack.length),
-      distance: '—',
-      shortest: '—'
-    });
-
-    carved[0][0] = true;
-    grid[0][0].carveHead = true;
-    updateCell(0, 0);
-
-    useAlgorithmMetricLabels();
-    showGrowthMetrics();
-
-    setStatus('The maze is growing from the bright tip. Watch it branch and retreat.', 'Growing');
-
     while (stack.length) {
-      if (!running || myRunId !== runId) return;
-      await waitWhilePaused(myRunId);
-      if (!running || myRunId !== runId) return;
-
       let cur = stack[stack.length - 1];
-
-      for (const row of grid) {
-        for (const cell of row) {
-          cell.carveHead = false;
-        }
-      }
-      grid[cur.r][cur.c].carveHead = true;
-      updateCell(cur.r, cur.c);
-
       let choices = uncarvedNeighbours(cur);
 
       if (!choices.length) {
         stack.pop();
-        showGrowthMetrics();
-
         if (stack.length) {
-          if (!(await moveHeadTo(cur, stack[stack.length - 1]))) return;
+          steps.push({ type: 'move', from: cur, path: treePath(cur, stack[stack.length - 1]), carved: carvedCount, stack: stack.length });
         } else {
-          grid[cur.r][cur.c].carveHead = false;
-          grid[cur.r][cur.c].carveTrail = true;
-          updateCell(cur.r, cur.c);
-          if (!(await pace(Math.max(6, growthDelay() * 0.45), myRunId))) return;
+          steps.push({ type: 'rest', at: cur, carved: carvedCount, stack: 0 });
         }
         continue;
       }
@@ -894,37 +814,237 @@
           const target = options[Math.floor(Math.random() * options.length)];
           stack.splice(stack.indexOf(target), 1);
           stack.push(target);
-          if (!(await moveHeadTo(cur, target))) return;
+          steps.push({ type: 'move', from: cur, path: treePath(cur, target), carved: carvedCount, stack: stack.length });
           cur = target;
           choices = uncarvedNeighbours(cur);
         }
       }
 
       const next = pickNext(cur, choices);
-
-      grid[cur.r][cur.c].carveHead = false;
-      grid[cur.r][cur.c].carveTrail = true;
-
-      setWall(edgeBetween(cur, next), false, { zap: true });
+      knock(cur, next);
       carved[next.r][next.c] = true;
       parent[next.r][next.c] = cur;
       depth[next.r][next.c] = depth[cur.r][cur.c] + 1;
-      grid[next.r][next.c].carveSpark = true;
-      grid[next.r][next.c].carveHead = true;
-      updateCell(cur.r, cur.c);
-      updateCell(next.r, next.c);
-
       stack.push(next);
-      carvedTargets++;
-      showGrowthMetrics();
-
-      if (!(await pace(growthDelay(), myRunId))) return;
-
-      grid[next.r][next.c].carveSpark = false;
-      updateCell(next.r, next.c);
+      carvedCount++;
+      steps.push({ type: 'carve', from: cur, to: next, carved: carvedCount, stack: stack.length });
     }
 
-    if (!(await addShortcuts(style.shortcuts, myRunId))) return;
+    // Shortcuts only add ways through, so if the corridors already join S
+    // and E too soon, nothing below can fix it.
+    if (giveUpWhenShort && minRoute) {
+      const route = routeLength(n, plan, from, to);
+      if (route < minRoute) return { steps, walls: plan, carved: carvedCount, route, short: true };
+    }
+
+    // Shortcuts dial: once the maze is a single-route tree, open a few extra
+    // walls so there is more than one way through. Each one opens a dead end
+    // where possible, so a wrong turn is less of a trap. A shortcut that
+    // would cut the S-to-E route below minRoute is put back and another
+    // tried, so shortcuts never turn the maze into a short hop.
+    const pick = list => list[Math.floor(Math.random() * list.length)];
+    const refused = new Set();
+    const closedSides = p => near(p).filter(q =>
+      !isOpen(p, q) && !direct(p, q) && !refused.has(edgeKey(edgeBetween(p, q)))
+    );
+    const openCount = Array.from({ length: n }, (_, r) =>
+      Array.from({ length: n }, (_, c) => near({ r, c }).filter(q => isOpen({ r, c }, q)).length)
+    );
+    const shortcuts = Math.round(SHORTCUT_SHARE[style.shortcuts] * n * n);
+    for (let i = 0; i < shortcuts; i++) {
+      for (let tries = 0; tries < 12; tries++) {
+        const deadEnds = [];
+        for (let r = 0; r < n; r++) {
+          for (let c = 0; c < n; c++) {
+            if (openCount[r][c] === 1 && closedSides({ r, c }).length) deadEnds.push({ r, c });
+          }
+        }
+
+        let a = null;
+        let b = null;
+        if (deadEnds.length) {
+          a = pick(deadEnds);
+          b = pick(closedSides(a));
+        } else {
+          const walled = [];
+          for (let r = 0; r < n; r++) {
+            for (let c = 0; c < n; c++) {
+              for (const q of closedSides({ r, c })) if (q.r > r || q.c > c) walled.push({ a: { r, c }, b: q });
+            }
+          }
+          if (!walled.length) break;
+          ({ a, b } = pick(walled));
+        }
+
+        knock(a, b);
+        if (minRoute && routeLength(n, plan, from, to) < minRoute) {
+          const edge = edgeBetween(a, b);
+          plan[edge.side][edge.r][edge.c] = true;
+          refused.add(edgeKey(edge));
+          continue;
+        }
+        openCount[a.r][a.c]++;
+        openCount[b.r][b.c]++;
+        steps.push({ type: 'shortcut', a, b });
+        break;
+      }
+    }
+
+    return { steps, walls: plan, carved: carvedCount, route: routeLength(n, plan, from, to) };
+  }
+
+  // Steps along the shortest route from a to b through a planned set of
+  // walls, or -1 when there is none.
+  function routeLength(n, plan, a, b) {
+    const dist = Array.from({ length: n }, () => Array(n).fill(-1));
+    dist[a.r][a.c] = 0;
+    const queue = [a];
+    for (let i = 0; i < queue.length; i++) {
+      const cur = queue[i];
+      if (cur.r === b.r && cur.c === b.c) return dist[cur.r][cur.c];
+      for (const [dr, dc] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+        const next = { r: cur.r + dr, c: cur.c + dc };
+        if (next.r < 0 || next.c < 0 || next.r >= n || next.c >= n || dist[next.r][next.c] >= 0) continue;
+        const edge = edgeBetween(cur, next);
+        if (plan[edge.side][edge.r][edge.c]) continue;
+        dist[next.r][next.c] = dist[cur.r][cur.c] + 1;
+        queue.push(next);
+      }
+    }
+    return -1;
+  }
+
+  // How long the S-to-E route usually is when S and E sit in opposite
+  // corners, for this size and Maze style. Worked out once per setting from
+  // a handful of sample plans, so it follows the level and the dials.
+  const cornerRouteCache = new Map();
+  function typicalCornerRoute(n, style) {
+    const cacheKey = `${n}:${style.twisty}:${style.shortcuts}:${style.branches}`;
+    if (!cornerRouteCache.has(cacheKey)) {
+      const routes = [];
+      for (let i = 0; i < 9; i++) {
+        routes.push(planMaze(n, style, { r: 0, c: 0 }, { r: n - 1, c: n - 1 }).route);
+      }
+      routes.sort((a, b) => a - b);
+      cornerRouteCache.set(cacheKey, routes[Math.floor(routes.length / 2)]);
+    }
+    return cornerRouteCache.get(cacheKey);
+  }
+
+  // Plan mazes until the route from S to E is at least half as long as a
+  // typical corner-to-corner route at this level, so moving S and E close
+  // together still gives a proper maze rather than a short hop. Shortcuts
+  // already steer clear of cutting the route short; when the corridors
+  // themselves join S and E too soon, plan again. After a short time it
+  // settles for the next maze, whatever its route.
+  const PLAN_BUDGET_MS = 150;
+  function planLongMaze(n, style, from, to) {
+    const wanted = Math.floor(typicalCornerRoute(n, style) / 2);
+    const startedAt = performance.now();
+    do {
+      const plan = planMaze(n, style, from, to, wanted, { giveUpWhenShort: true });
+      if (!plan.short) return plan;
+    } while (performance.now() - startedAt < PLAN_BUDGET_MS);
+    return planMaze(n, style, from, to, wanted);
+  }
+
+  async function animateMazeGrowth() {
+    exitUserSolveMode(false);
+    cancelAnimation();
+
+    const myRunId = runId;
+    running = true;
+    paused = false;
+    runType = 'generate';
+    pauseBtn.disabled = false;
+    setInteractiveDisabled(true);
+
+    // S and E stay where the child put them; the maze grows around them.
+    const plan = planLongMaze(size, mazeStyle(), start, end);
+
+    // Every edge starts as a wall; the generator knocks out one edge per
+    // step until each square is joined to the rest.
+    grid = Array.from({ length: size }, () =>
+      Array.from({ length: size }, () => createCellState())
+    );
+    walls = makeWalls(true);
+    render();
+    bringMazeIntoView();
+
+    const totalTargets = size * size;
+    const showGrowthMetrics = step => setMetrics({
+      progress: `${Math.min(100, Math.round(step.carved / totalTargets * 100))}%`,
+      explored: String(step.carved),
+      frontier: String(step.stack),
+      distance: '—',
+      shortest: '—'
+    });
+
+    let head = start;
+    const moveHead = (to, { trail = true } = {}) => {
+      grid[head.r][head.c].carveHead = false;
+      if (trail) grid[head.r][head.c].carveTrail = true;
+      updateCell(head.r, head.c);
+      head = to;
+      grid[head.r][head.c].carveHead = true;
+      updateCell(head.r, head.c);
+    };
+
+    grid[start.r][start.c].carveHead = true;
+    updateCell(start.r, start.c);
+
+    useAlgorithmMetricLabels();
+    showGrowthMetrics({ carved: 1, stack: 1 });
+
+    setStatus('The maze is growing from the bright tip. Watch it branch and retreat.', 'Growing');
+
+    let shortcutsAnnounced = false;
+    for (const step of plan.steps) {
+      if (!running || myRunId !== runId) return;
+      await waitWhilePaused(myRunId);
+      if (!running || myRunId !== runId) return;
+
+      if (step.type === 'carve') {
+        setWall(edgeBetween(step.from, step.to), false, { zap: true });
+        grid[step.to.r][step.to.c].carveSpark = true;
+        moveHead(step.to);
+        showGrowthMetrics(step);
+        if (!(await pace(growthDelay(), myRunId))) return;
+        grid[step.to.r][step.to.c].carveSpark = false;
+        updateCell(step.to.r, step.to.c);
+      } else if (step.type === 'move') {
+        // Walk the bright tip back through carved corridors so a retreat is
+        // always visible, never a teleport.
+        showGrowthMetrics(step);
+        for (let i = 0; i < step.path.length; i++) {
+          moveHead(step.path[i]);
+          // Long trips back speed up after the first few steps.
+          const beat = Math.max(6, growthDelay() * 0.45) / (i < 3 ? 1 : 3);
+          if (!(await pace(beat, myRunId))) return;
+        }
+      } else if (step.type === 'rest') {
+        showGrowthMetrics(step);
+        grid[head.r][head.c].carveHead = false;
+        grid[head.r][head.c].carveTrail = true;
+        updateCell(head.r, head.c);
+        if (!(await pace(Math.max(6, growthDelay() * 0.45), myRunId))) return;
+      } else if (step.type === 'shortcut') {
+        if (!shortcutsAnnounced) {
+          setStatus('Adding shortcuts, so there is more than one way through.', 'Growing');
+          shortcutsAnnounced = true;
+        }
+        setWall(edgeBetween(step.a, step.b), false, { zap: true });
+        for (const p of [step.a, step.b]) {
+          grid[p.r][p.c].carveSpark = true;
+          updateCell(p.r, p.c);
+        }
+        if (!(await pace(growthDelay() * 2.5, myRunId))) return;
+        for (const p of [step.a, step.b]) {
+          grid[p.r][p.c].carveSpark = false;
+          updateCell(p.r, p.c);
+        }
+      }
+    }
 
     for (const row of grid) {
       for (const cell of row) {
@@ -940,7 +1060,7 @@
     setInteractiveDisabled(false);
     setMetrics({
       progress: '100%',
-      explored: String(carvedTargets),
+      explored: String(plan.carved),
       frontier: '0',
       distance: '—',
       shortest: '—'
@@ -1021,6 +1141,7 @@
     runType = 'solve';
     pauseBtn.disabled = false;
     setInteractiveDisabled(true);
+    bringMazeIntoView();
 
     let explored = 0;
 
@@ -1215,6 +1336,7 @@
         distance: String(Math.max(0, result.layers.length - 1)),
         shortest: '—'
       });
+      bringMazeIntoView();
       setStatus(`No path found after exploring ${explored} squares.`, 'No Path');
       return;
     }
@@ -1231,6 +1353,7 @@
       distance: String(result.path.length - 1),
       shortest: String(result.path.length - 1)
     });
+    bringMazeIntoView();
     setStatus(`Solved instantly. Shortest route: ${result.path.length - 1} steps.`, 'Solved');
   }
 
@@ -1390,6 +1513,7 @@
     setInteractiveDisabled(true);
     document.getElementById('clearSolutionBtn').disabled = false;
     userSolveBtn.disabled = false;
+    bringMazeIntoView();
 
     setStatus('Touch S with Apple Pencil or your finger, then trace through the corridors to E.', 'Your Turn');
   }

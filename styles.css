@@ -554,6 +554,8 @@ select:disabled {
   -webkit-user-select: none;
   background: #fff;
   isolation: isolate;
+  /* Breathing room when the app scrolls the maze into view. */
+  scroll-margin: calc(env(safe-area-inset-top) + 12px) 0 calc(env(safe-area-inset-bottom) + 12px);
 }
 
 .cell {
