@@ -928,6 +928,9 @@ Current modes conceptually include:
 - Slow
 - Medium
 - Fast
+- Super fast
+
+Super fast grows a maze as a short fast-forward of the same plan (about a second of playback, driven by the clock rather than per-step delays), so even the hardest 25 × 25 maze is built in under 2.5 seconds. The tip still visibly travels and retreats; only the pauses go. `tests/super-fast.spec.js` holds that time limit.
 
 Changing speed should affect algorithm animations without breaking correctness.
 
