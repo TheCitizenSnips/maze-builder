@@ -433,6 +433,8 @@ Conceptually:
 
 Generated mazes should remain valid and connected.
 
+Growing a maze keeps Start and Finish wherever they are; only changing the size puts them back in the corners. The whole maze is planned before the animation plays, so the planner can check the S-to-E route: it never opens the wall between side-by-side S and E, shortcuts that would cut the route below half a typical corner-to-corner route for the level are skipped, and a plan whose corridors join S and E too soon is replaced. Keep algorithm logic in the planner and visuals in the playback.
+
 Do not replace this with random wall placement.
 
 The important property is that generated mazes are real mazes, not arbitrary grids that may be nonsensical.
