@@ -216,6 +216,7 @@
 
   const key = (r, c) => `${r},${c}`;
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+  const nextFrame = () => new Promise(resolve => requestAnimationFrame(resolve));
 
   function setStatus(message, phase = null) {
     statusEl.textContent = message;
@@ -272,6 +273,12 @@
 
   function currentDelay() {
     return Number(speedSelect.value);
+  }
+
+  // Super fast (a delay of 0) grows the maze as a short fast-forward rather
+  // than one beat per step, so even the biggest maze is ready in moments.
+  function isSuperFast() {
+    return currentDelay() === 0;
   }
 
   // Thin walls make every square part of the maze, so a big grid has far
@@ -964,6 +971,9 @@
     return planMaze(n, style, from, to, wanted);
   }
 
+  // How long Super fast takes to play a whole maze, after planning.
+  const FAST_FORWARD_MS = 900;
+
   async function animateMazeGrowth() {
     exitUserSolveMode(false);
     cancelAnimation();
@@ -1015,11 +1025,105 @@
     setStatus('The maze is growing from the bright tip. Watch it branch and retreat.', 'Growing');
 
     let shortcutsAnnounced = false;
-    for (const step of plan.steps) {
+    const announceShortcuts = () => {
+      if (shortcutsAnnounced) return;
+      setStatus('Adding shortcuts, so there is more than one way through.', 'Growing');
+      shortcutsAnnounced = true;
+    };
+
+    // Super fast: each frame carries out the steps due by then, so the whole
+    // plan plays in about FAST_FORWARD_MS whatever the size and style. The
+    // tip still travels every corridor, it just skips the pauses. Returns
+    // where it stopped (the speed was changed back), or -1 when cancelled.
+    const fastForwardFrom = async from => {
+      const work = step => step.type === 'move' ? 0.15 * step.path.length
+        : step.type === 'shortcut' ? 2.5 : 1;
+      const total = plan.steps.reduce((sum, step) => sum + work(step), 0);
+      const perMs = total / FAST_FORWARD_MS;
+      let i = from;
+      let due = 0;
+      let sparks = [];
+      let last = performance.now();
+      const clearSparks = () => {
+        for (const p of sparks) {
+          grid[p.r][p.c].carveSpark = false;
+          updateCell(p.r, p.c);
+        }
+        sparks = [];
+      };
+
+      mazeStage.classList.add('fast-forward');
+      try {
+        return await playFrames();
+      } finally {
+        mazeStage.classList.remove('fast-forward');
+      }
+
+      async function playFrames() {
+      while (i < plan.steps.length && isSuperFast()) {
+        await nextFrame();
+        if (!running || myRunId !== runId) return -1;
+        if (paused) {
+          await waitWhilePaused(myRunId);
+          if (!running || myRunId !== runId) return -1;
+          last = performance.now();
+          continue;
+        }
+        // Driven by the clock, not the frame count, so a busy device shows
+        // bigger jumps but still finishes on time.
+        const now = performance.now();
+        due += (now - last) * perMs;
+        last = now;
+        clearSparks();
+
+        let shown = null;
+        while (i < plan.steps.length && due > 0) {
+          const step = plan.steps[i++];
+          due -= work(step);
+          if (step.type === 'carve') {
+            setWall(edgeBetween(step.from, step.to), false, { zap: true });
+            grid[step.to.r][step.to.c].carveSpark = true;
+            sparks.push(step.to);
+            moveHead(step.to);
+            shown = step;
+          } else if (step.type === 'move') {
+            for (const p of step.path) moveHead(p);
+            shown = step;
+          } else if (step.type === 'rest') {
+            grid[head.r][head.c].carveHead = false;
+            grid[head.r][head.c].carveTrail = true;
+            updateCell(head.r, head.c);
+            shown = step;
+          } else if (step.type === 'shortcut') {
+            announceShortcuts();
+            setWall(edgeBetween(step.a, step.b), false, { zap: true });
+            for (const p of [step.a, step.b]) {
+              grid[p.r][p.c].carveSpark = true;
+              sparks.push(p);
+              updateCell(p.r, p.c);
+            }
+          }
+        }
+        if (shown) showGrowthMetrics(shown);
+      }
+      clearSparks();
+      return i;
+      }
+    };
+
+    let next = 0;
+    while (next < plan.steps.length) {
       if (!running || myRunId !== runId) return;
       await waitWhilePaused(myRunId);
       if (!running || myRunId !== runId) return;
 
+      if (isSuperFast()) {
+        next = await fastForwardFrom(next);
+        if (next < 0) return;
+        continue;
+      }
+
+      const step = plan.steps[next++];
       if (step.type === 'carve') {
         setWall(edgeBetween(step.from, step.to), false, { zap: true });
         grid[step.to.r][step.to.c].carveSpark = true;
@@ -1045,10 +1149,7 @@
         updateCell(head.r, head.c);
         if (!(await pace(Math.max(6, growthDelay() * 0.45), myRunId))) return;
       } else if (step.type === 'shortcut') {
-        if (!shortcutsAnnounced) {
-          setStatus('Adding shortcuts, so there is more than one way through.', 'Growing');
-          shortcutsAnnounced = true;
-        }
+        announceShortcuts();
         setWall(edgeBetween(step.a, step.b), false, { zap: true });
         for (const p of [step.a, step.b]) {
           grid[p.r][p.c].carveSpark = true;

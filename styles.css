@@ -689,6 +689,19 @@ select:disabled {
   }
 }
 
+/* Super fast grows hundreds of squares a second, so its sparks and trail
+   are short colour flashes without glow, which keeps every frame cheap. */
+.maze-stage.fast-forward .cell.carve-trail { animation-duration: 260ms; }
+
+.maze-stage.fast-forward .cell.carve-spark { animation: fastSpark 200ms ease-out both; }
+
+.maze-stage.fast-forward .wall-layer line.zap { animation-duration: 220ms; }
+
+@keyframes fastSpark {
+  from { background: #c8f2ff; }
+  to { background: #ffffff; }
+}
+
 .cell.frontier:not(.start):not(.end) {
   z-index: 2;
   background: var(--frontier);
