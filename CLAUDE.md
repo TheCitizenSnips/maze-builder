@@ -175,11 +175,7 @@ Expected structure:
     └── icon-maskable-512.png
 ```
 
-GitHub Pages is configured to deploy:
-
-```text
-main → / (root)
-```
+GitHub Pages publishes from the `.github/workflows/pages.yml` workflow on every push to `main` (Settings → Pages → Source → GitHub Actions). It publishes the repository root as is, minus the test tooling. Its one change is the release stamp: it replaces `__MAZE_BUILD__` in `index.html` and `app.js` with `<commit>|<commit time>`, which the offline badge shows and which lets the app detect a page and script from different releases. Keep the placeholder in both files; there is no version to bump by hand.
 
 The live published app is:
 

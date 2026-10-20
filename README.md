@@ -105,9 +105,18 @@ with Apple Pencil.
 
 ## GitHub Pages
 
-Upload the package contents to the repository root and enable:
+The repository root is the site. Every push to `main` runs
+`.github/workflows/pages.yml`, which copies the site (minus the test tooling),
+stamps the release into `index.html` and `app.js`, and publishes it. Pages must
+be set to:
 
-**Settings → Pages → Deploy from a branch → main → / (root)**
+**Settings → Pages → Source → GitHub Actions**
+
+The stamp is the short commit id and commit time. The offline badge shows it
+(for example "Offline ready · Oct 20, 4:07 AM · 8e4b569"), so you can tell at a
+glance which release a device is running. Local copies show no version. If a
+device ever ends up with a page and script from different releases, the app
+notices the mismatch and reloads once for matching copies.
 
 ## Install on iPhone / iPad
 

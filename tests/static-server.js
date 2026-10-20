@@ -5,7 +5,8 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const ROOT = path.resolve(__dirname, '..');
+// STATIC_ROOT lets a test serve another copy of the app, such as an old release.
+const ROOT = path.resolve(process.env.STATIC_ROOT || path.join(__dirname, '..'));
 const BASE = '/maze-builder/';
 const PORT = Number(process.env.PORT || 4173);
 let requestCount = 0;

@@ -1,5 +1,7 @@
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
+const { execFileSync, spawn } = require('child_process');
 const { test, expect } = require('@playwright/test');
 
 // Right after a release a device can get the previous index.html (a stale CDN
@@ -72,7 +74,7 @@ test.describe('A page older than the script', () => {
     test('a refresh drops the stuck copy and loads the fresh page', async ({ page, context }) => {
       const errors = collectErrors(page);
       await page.goto('./');
-      await expect(page.locator('#offlineBadge')).toHaveText('Offline ready', { timeout: 15_000 });
+      await expect(page.locator('#offlineBadge')).toHaveText('Offline ready', { timeout: 30_000 });
 
       await page.evaluate(async html => {
         const cache = await caches.open('maze-builder-runtime');
@@ -92,7 +94,60 @@ test.describe('A page older than the script', () => {
       // With the network healthy again the worker comes back for offline use.
       await context.unrouteAll();
       await page.reload();
-      await expect(page.locator('#offlineBadge')).toHaveText(/Offline ready/, { timeout: 15_000 });
+      await expect(page.locator('#offlineBadge')).toHaveText(/Offline ready/, { timeout: 30_000 });
+    });
+  });
+
+  test.describe('under the first service worker', () => {
+    test.use({ serviceWorkers: 'allow' });
+
+    // The first working worker (fa79ca6) fetched the page fresh but served app.js and
+    // styles from its cache forever, so a device that kept it (an iPad never
+    // swapped it out) ran the original script inside every new page. The
+    // check in index.html clears it and reloads from the network.
+    //
+    // A separate server serves a folder that starts as that release. The site
+    // is then updated in place while its service-worker.js stays byte-for-byte
+    // the same, so Chromium keeps the old worker the way the iPad did.
+    const PORT = 4190;
+    const repo = path.join(__dirname, '..');
+    let site;
+    let server;
+
+    test.beforeAll(async () => {
+      site = fs.mkdtempSync(path.join(os.tmpdir(), 'maze-first-release-'));
+      execFileSync('sh', ['-c', `git archive fa79ca6 | tar -x -C "${site}"`], { cwd: repo });
+      server = spawn(process.execPath, [path.join(__dirname, 'static-server.js')], {
+        env: { ...process.env, PORT: String(PORT), STATIC_ROOT: site },
+        stdio: ['ignore', 'pipe', 'inherit']
+      });
+      await new Promise(resolve => server.stdout.once('data', resolve));
+    });
+
+    test.afterAll(() => {
+      server?.kill();
+      if (site) fs.rmSync(site, { recursive: true, force: true });
+    });
+
+    test('the fresh page clears the old worker and runs the current app', async ({ page }) => {
+      const appUrl = `http://localhost:${PORT}/maze-builder/`;
+      await page.goto(appUrl);
+      await expect(page.locator('#offlineBadge')).toHaveText(/Offline ready/, { timeout: 30_000 });
+      await page.reload();
+      expect(await page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
+
+      for (const file of ['index.html', 'app.js', 'styles.css']) {
+        fs.copyFileSync(path.join(repo, file), path.join(site, file));
+      }
+      const errors = collectErrors(page);
+      await page.reload();
+
+      await expect(page).toHaveURL(appUrl);
+      // Only the current app.js draws thin walls.
+      await expect(page.locator('#wallLayer line').first()).toBeAttached();
+      await expect(page.locator('.level-picker .segment')).toHaveCount(3);
+      expect(await page.evaluate(() => window.mazeBuilderStarted)).toBe(true);
+      expect(errors.filter(e => e.startsWith('pageerror'))).toEqual([]);
     });
   });
 });

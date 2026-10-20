@@ -1,0 +1,52 @@
+# Publishes the app to GitHub Pages on every push to main, stamping the
+# release into index.html and app.js on the way so the offline badge can show
+# which version is running. Nothing is built: the site is the repository as it
+# is, minus the test tooling, with one placeholder filled in.
+#
+# Needs Settings → Pages → Source set to "GitHub Actions".
+name: Deploy to Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Copy the site and stamp the release
+        run: |
+          mkdir _site
+          git archive HEAD | tar -x -C _site
+          rm -rf _site/tests _site/.github _site/package.json _site/package-lock.json _site/playwright.config.js
+          build="$(git rev-parse --short HEAD)|$(git log -1 --format=%cI)"
+          sed -i "s/__MAZE_BUILD__/${build}/g" _site/index.html _site/app.js
+          if grep -q __MAZE_BUILD__ _site/index.html _site/app.js; then
+            echo "Release stamp was not applied" >&2
+            exit 1
+          fi
+          echo "Stamped ${build}"
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

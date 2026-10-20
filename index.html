@@ -7,6 +7,8 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Maze Builder">
+  <!-- Release stamp: the Pages workflow writes "<commit>|<commit time>" here and in app.js. -->
+  <meta name="maze-build" content="__MAZE_BUILD__">
   <meta name="description" content="An animated iOS-first maze builder and pathfinding playground for kids.">
   <title>Maze Builder</title>
 
@@ -256,6 +258,40 @@
     </section>
   </main>
 
+  <script>
+    // Safety net for a stuck offline copy. Every version of the service worker
+    // fetches this page fresh when online, but the first one kept serving the
+    // original app.js and styles forever, and a device can keep a worker like
+    // that for a long time. If app.js has not started properly by the time the
+    // page has loaded, this drops Maze Builder's own worker and caches and
+    // reloads once from the network, like a first visit. Offline, or after
+    // one try (the fresh query), it leaves the page alone.
+    window.addEventListener('load', function () {
+      var url = new URL(location.href);
+      if (window.mazeBuilderStarted || window.mazeBuilderReloading || url.searchParams.has('fresh') || navigator.onLine === false) return;
+      var scope = new URL('./', location.href).href;
+      var work = [];
+      if ('serviceWorker' in navigator) {
+        work.push(navigator.serviceWorker.getRegistrations().then(function (registrations) {
+          return Promise.all(registrations
+            .filter(function (r) { return r.scope === scope; })
+            .map(function (r) { return r.unregister(); }));
+        }));
+      }
+      if (window.caches) {
+        work.push(caches.keys().then(function (keys) {
+          return Promise.all(keys
+            .filter(function (key) { return key.indexOf('maze-builder') === 0; })
+            .map(function (key) { return caches.delete(key); }));
+        }));
+      }
+      var giveUp = new Promise(function (resolve) { setTimeout(resolve, 3000); });
+      Promise.race([Promise.all(work), giveUp]).catch(function () {}).then(function () {
+        url.searchParams.set('fresh', Date.now());
+        location.replace(url.href);
+      });
+    });
+  </script>
   <script src="./app.js" defer></script>
 </body>
 </html>
