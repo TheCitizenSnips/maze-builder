@@ -34,6 +34,26 @@ test.describe('Printing', () => {
     expect(colours.gold).toBe('rgb(255, 214, 10)');
   });
 
+  test('nothing but the maze has a background, so no grey box prints around it', async ({ page }) => {
+    await openApp(page, { size: 15 });
+    await page.emulateMedia({ media: 'print' });
+
+    const shaded = await page.evaluate(() => {
+      const blank = c => c === 'rgba(0, 0, 0, 0)' || c === 'rgb(255, 255, 255)';
+      const out = [];
+      for (const el of [document.documentElement, document.body, ...document.body.querySelectorAll('*')]) {
+        if (el.closest('#mazeStage') || el.closest('#successSheet')) continue;
+        const cs = getComputedStyle(el);
+        if (!el.getClientRects().length && el !== document.documentElement) continue;
+        if (!blank(cs.backgroundColor) || cs.backgroundImage !== 'none') {
+          out.push(`${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''}.${el.className} ${cs.backgroundColor} ${cs.backgroundImage}`);
+        }
+      }
+      return out;
+    });
+    expect(shaded).toEqual([]);
+  });
+
   test('the largest maze fits across a Letter or A4 page', async ({ page }) => {
     await openApp(page);
     await setSize(page, 25);

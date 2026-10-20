@@ -212,6 +212,44 @@ async function traceCells(page, cells, { pointer, keepDown = false, alreadyDown 
   if (!keepDown) await pointer.up();
 }
 
+/**
+ * Start recording, every frame, how far the maze and any square move or
+ * change size from where they rest. Call the returned function to stop and
+ * get the largest drift in CSS pixels. Squares sit under fixed wall lines,
+ * so any drift reads as the maze jittering.
+ */
+async function watchMazeStillness(page) {
+  await page.evaluate(() => {
+    const maze = document.getElementById('maze');
+    const box = el => {
+      const r = el.getBoundingClientRect();
+      return [r.left, r.top, r.width, r.height];
+    };
+    const rest = [maze, ...maze.children].map(box);
+    const watch = { worst: 0, where: '', frames: 0, running: true };
+    window.__mazeStillness = watch;
+    const tick = () => {
+      if (!watch.running) return;
+      watch.frames++;
+      [maze, ...maze.children].forEach((el, i) => {
+        const now = box(el);
+        const drift = Math.max(...now.map((v, k) => Math.abs(v - rest[i][k])));
+        if (drift > watch.worst) {
+          watch.worst = drift;
+          watch.where = i === 0 ? 'maze' : `square ${el.dataset.r},${el.dataset.c} (${el.className})`;
+        }
+      });
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+  return () => page.evaluate(() => {
+    const watch = window.__mazeStillness;
+    watch.running = false;
+    return { worst: watch.worst, where: watch.where, frames: watch.frames };
+  });
+}
+
 async function metric(page, n) {
   const ids = ['metricProgress', 'metricExplored', 'metricFrontier', 'metricDistance', 'metricShortest'];
   return (await page.locator(`#${ids[n - 1]}`).textContent()).trim();
@@ -258,6 +296,7 @@ module.exports = {
   defaultPointerType,
   traceCells,
   metric,
+  watchMazeStillness,
   toggleWall,
   edgePoint,
   blankRoute
