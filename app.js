@@ -2058,6 +2058,58 @@
     setStatus('Nice work. Touch S to try this maze again, or tap Stop Solving.', 'Complete');
   });
 
+  // Learn sheets: each ⓘ button names a topic (grow, search, solve) and opens
+  // that explainer over the app. The one by the maze title opens whichever
+  // topic matches what the maze is doing right now. Reading never changes
+  // the maze, so the buttons stay on during animations and solving.
+  function infoTopicNow() {
+    if (userSolveMode) return 'solve';
+    if (runType === 'solve' || (!running && hasSearchMarks())) return 'search';
+    return 'grow';
+  }
+
+  function openInfo(topic, sectionId = null) {
+    const sheet = document.getElementById(`info-${topic === 'now' ? infoTopicNow() : topic}`);
+    if (!sheet) return;
+    for (const open of document.querySelectorAll('dialog.info-sheet[open]')) {
+      if (open !== sheet) open.close();
+    }
+    if (!sheet.open) {
+      if (typeof sheet.showModal === 'function') sheet.showModal();
+      else sheet.setAttribute('open', '');
+    }
+    document.documentElement.classList.add('info-open');
+    const body = sheet.querySelector('.info-sheet-body');
+    const section = sectionId && document.getElementById(sectionId);
+    if (section) section.scrollIntoView({ block: 'start' });
+    else if (body) body.scrollTop = 0;
+    // Focus the reading area rather than Done, so a tap does not leave a focus
+    // ring on Done and the arrow keys scroll the text.
+    if (body) body.focus({ preventScroll: true });
+  }
+
+  function closeInfo(sheet) {
+    if (typeof sheet.close === 'function') sheet.close();
+    else sheet.removeAttribute('open');
+  }
+
+  for (const btn of document.querySelectorAll('[data-info]')) {
+    btn.addEventListener('click', () => openInfo(btn.dataset.info, btn.dataset.infoSection));
+  }
+
+  for (const sheet of document.querySelectorAll('dialog.info-sheet')) {
+    sheet.querySelector('[data-info-close]').addEventListener('click', () => closeInfo(sheet));
+    // A tap on the dimmed backdrop lands on the dialog itself, outside the card.
+    sheet.addEventListener('click', e => {
+      if (e.target === sheet) closeInfo(sheet);
+    });
+    sheet.addEventListener('close', () => {
+      if (!document.querySelector('dialog.info-sheet[open]')) {
+        document.documentElement.classList.remove('info-open');
+      }
+    });
+  }
+
   // Keep the route overlay on the cells when the maze changes size for any
   // reason: rotation, a different grid size, or the layout around it moving.
   if ('ResizeObserver' in window) {

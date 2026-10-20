@@ -34,6 +34,7 @@
     <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 2l1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8L12 2zm7 12l.9 3.1L23 18l-3.1.9L19 22l-.9-3.1L15 18l3.1-.9L19 14z"/></symbol>
     <symbol id="i-route" viewBox="0 0 24 24"><path d="M6 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6zm12 12a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM7 8h5a4 4 0 0 1 4 4v3h-2v-3a2 2 0 0 0-2-2H7V8z"/></symbol>
     <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.8 9.95l-3.75-3.75L3 17.25zm17.7-10.04a1 1 0 0 0 0-1.41L18.2 3.3a1 1 0 0 0-1.41 0l-1.96 1.96 3.75 3.75 2.12-1.8z"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 1.8a8.2 8.2 0 1 1 0 16.4 8.2 8.2 0 0 1 0-16.4zM12 7a1.3 1.3 0 1 0 0 2.6A1.3 1.3 0 0 0 12 7zm-1.1 4v6.2h2.2V11h-2.2z"/></symbol>
     <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M18 2H6v3H3v4c0 2.2 1.8 4 4 4h.2A5 5 0 0 0 11 16.9V19H7v2h10v-2h-4v-2.1A5 5 0 0 0 16.8 13H17c2.2 0 4-1.8 4-4V5h-3V2zM5 9V7h1v3.7A2 2 0 0 1 5 9zm14 0a2 2 0 0 1-1 1.7V7h1v2z"/></symbol>
   </svg>
 
@@ -56,7 +57,7 @@
     <section class="workspace">
       <aside class="sidebar">
         <section class="group-card">
-          <div class="section-label">Maze</div>
+          <div class="section-label section-label-info"><span>Maze</span><button class="info-button" data-info="grow" aria-label="How a maze grows"><svg><use href="#i-info"></use></svg></button></div>
 
           <div class="segmented level-picker" role="group" aria-label="Level">
             <button class="segment" data-level="easy" aria-pressed="false"><span>Easy</span></button>
@@ -115,7 +116,7 @@
 
 
         <section class="group-card">
-          <div class="section-label">Animate</div>
+          <div class="section-label section-label-info"><span>Animate</span><button class="info-button" data-info="search" aria-label="How the search finds the way"><svg><use href="#i-info"></use></svg></button></div>
 
           <button id="generateBtn" class="ios-button primary">
             <svg><use href="#i-spark"></use></svg>
@@ -171,6 +172,21 @@
           <div class="info-title">What you are seeing</div>
           <p><strong>Maze growth:</strong> the bright tip is the live carving point; the soft glow behind it is where the maze has just grown.</p>
           <p><strong>Path search:</strong> cyan is the active wavefront, blue is explored territory, and gold is the final shortest route.</p>
+
+          <div class="learn-list" role="group" aria-label="Learn how it works">
+            <button class="list-action" data-info="grow">
+              <span class="list-action-leading"><svg><use href="#i-spark"></use></svg>How a maze grows</span>
+              <span class="chevron">›</span>
+            </button>
+            <button class="list-action" data-info="search">
+              <span class="list-action-leading"><svg><use href="#i-route"></use></svg>How the search works</span>
+              <span class="chevron">›</span>
+            </button>
+            <button class="list-action" data-info="solve">
+              <span class="list-action-leading"><svg><use href="#i-pencil"></use></svg>How your score works</span>
+              <span class="chevron">›</span>
+            </button>
+          </div>
         </section>
       </aside>
 
@@ -178,7 +194,10 @@
         <div class="content-header">
           <div class="content-heading">
             <div id="phaseLabel" class="phase-label">Ready</div>
-            <div class="section-title">Interactive Maze</div>
+            <div class="section-title-row">
+              <div class="section-title">Interactive Maze</div>
+              <button id="infoNowBtn" class="info-button" data-info="now" aria-label="What is happening in the maze?"><svg><use href="#i-info"></use></svg></button>
+            </div>
             <div id="status" class="status-text">Tap “Grow a Maze” to watch one build itself.</div>
           </div>
 
@@ -249,6 +268,8 @@
               <div><span id="successEfficiency">100%</span><small>Efficiency</small></div>
             </div>
 
+            <button class="success-learn" data-info="solve" data-info-section="info-solve-score"><svg><use href="#i-info"></use></svg>How is my score worked out?</button>
+
             <button id="successAgainBtn" class="ios-button primary">Try Again</button>
             <button id="successCloseBtn" class="success-close">Done</button>
 
@@ -258,6 +279,165 @@
       </section>
     </section>
   </main>
+
+  <!-- Learn sheets: kid-friendly explainers opened by the ⓘ buttons. Each one
+       describes what app.js really does, so update the words here when the
+       generator, the search or the scoring changes. -->
+  <dialog id="info-grow" class="info-sheet" data-tint="indigo" aria-labelledby="info-grow-title">
+    <div class="info-sheet-card">
+      <header class="info-sheet-header">
+        <span class="info-sheet-icon"><svg><use href="#i-spark"></use></svg></span>
+        <h2 id="info-grow-title">How a maze grows</h2>
+        <button class="info-sheet-done" data-info-close>Done</button>
+      </header>
+      <div class="info-sheet-body" tabindex="-1">
+        <p class="info-lead">Every maze starts as a grid of tiny rooms with walls all around. A bright spark builds the maze by knocking down walls, one at a time.</p>
+
+        <div class="info-diagram">
+          <figure><svg class="info-diagram-maze" viewBox="0 0 94 94" aria-hidden="true"><rect x="1.5" y="1.5" width="91" height="91" rx="3" class="d-path"/><rect x="3" y="3" width="22" height="22" class="d-start"/><rect x="69" y="69" width="22" height="22" class="d-end"/><line x1="25" y1="3" x2="25" y2="25" class="d-wall"/><line x1="3" y1="25" x2="25" y2="25" class="d-wall"/><line x1="47" y1="3" x2="47" y2="25" class="d-wall"/><line x1="25" y1="25" x2="47" y2="25" class="d-wall"/><line x1="69" y1="3" x2="69" y2="25" class="d-wall"/><line x1="47" y1="25" x2="69" y2="25" class="d-wall"/><line x1="69" y1="25" x2="91" y2="25" class="d-wall"/><line x1="25" y1="25" x2="25" y2="47" class="d-wall"/><line x1="3" y1="47" x2="25" y2="47" class="d-wall"/><line x1="47" y1="25" x2="47" y2="47" class="d-wall"/><line x1="25" y1="47" x2="47" y2="47" class="d-wall"/><line x1="69" y1="25" x2="69" y2="47" class="d-wall"/><line x1="47" y1="47" x2="69" y2="47" class="d-wall"/><line x1="69" y1="47" x2="91" y2="47" class="d-wall"/><line x1="25" y1="47" x2="25" y2="69" class="d-wall"/><line x1="3" y1="69" x2="25" y2="69" class="d-wall"/><line x1="47" y1="47" x2="47" y2="69" class="d-wall"/><line x1="25" y1="69" x2="47" y2="69" class="d-wall"/><line x1="69" y1="47" x2="69" y2="69" class="d-wall"/><line x1="47" y1="69" x2="69" y2="69" class="d-wall"/><line x1="69" y1="69" x2="91" y2="69" class="d-wall"/><line x1="25" y1="69" x2="25" y2="91" class="d-wall"/><line x1="47" y1="69" x2="47" y2="91" class="d-wall"/><line x1="69" y1="69" x2="69" y2="91" class="d-wall"/><circle cx="14" cy="14" r="8" class="d-head"/><text x="14" y="14" class="d-letter">S</text><text x="80" y="80" class="d-letter">F</text><rect x="1.5" y="1.5" width="91" height="91" rx="3" class="d-border"/></svg><figcaption>All walls up</figcaption></figure>
+          <figure><svg class="info-diagram-maze" viewBox="0 0 94 94" aria-hidden="true"><rect x="1.5" y="1.5" width="91" height="91" rx="3" class="d-path"/><rect x="3" y="3" width="22" height="22" class="d-start"/><rect x="25" y="3" width="22" height="22" class="d-trail"/><rect x="3" y="25" width="22" height="22" class="d-trail"/><rect x="25" y="25" width="22" height="22" class="d-trail"/><rect x="3" y="47" width="22" height="22" class="d-trail"/><rect x="3" y="69" width="22" height="22" class="d-trail"/><rect x="25" y="69" width="22" height="22" class="d-trail"/><rect x="69" y="69" width="22" height="22" class="d-end"/><line x1="3" y1="25" x2="25" y2="25" class="d-wall"/><line x1="47" y1="3" x2="47" y2="25" class="d-wall"/><line x1="69" y1="3" x2="69" y2="25" class="d-wall"/><line x1="47" y1="25" x2="69" y2="25" class="d-wall"/><line x1="69" y1="25" x2="91" y2="25" class="d-wall"/><line x1="47" y1="25" x2="47" y2="47" class="d-wall"/><line x1="25" y1="47" x2="47" y2="47" class="d-wall"/><line x1="69" y1="25" x2="69" y2="47" class="d-wall"/><line x1="47" y1="47" x2="69" y2="47" class="d-wall"/><line x1="69" y1="47" x2="91" y2="47" class="d-wall"/><line x1="25" y1="47" x2="25" y2="69" class="d-wall"/><line x1="47" y1="47" x2="47" y2="69" class="d-wall"/><line x1="25" y1="69" x2="47" y2="69" class="d-wall"/><line x1="69" y1="47" x2="69" y2="69" class="d-wall"/><line x1="47" y1="69" x2="69" y2="69" class="d-wall"/><line x1="69" y1="69" x2="91" y2="69" class="d-wall"/><line x1="47" y1="69" x2="47" y2="91" class="d-wall"/><line x1="69" y1="69" x2="69" y2="91" class="d-wall"/><circle cx="36" cy="80" r="8" class="d-head"/><text x="14" y="14" class="d-letter">S</text><text x="80" y="80" class="d-letter">F</text><rect x="1.5" y="1.5" width="91" height="91" rx="3" class="d-border"/></svg><figcaption>The spark digs</figcaption></figure>
+          <figure><svg class="info-diagram-maze" viewBox="0 0 94 94" aria-hidden="true"><rect x="1.5" y="1.5" width="91" height="91" rx="3" class="d-path"/><rect x="3" y="3" width="22" height="22" class="d-start"/><rect x="69" y="69" width="22" height="22" class="d-end"/><line x1="3" y1="25" x2="25" y2="25" class="d-wall"/><line x1="47" y1="3" x2="47" y2="25" class="d-wall"/><line x1="47" y1="25" x2="47" y2="47" class="d-wall"/><line x1="25" y1="47" x2="47" y2="47" class="d-wall"/><line x1="69" y1="25" x2="69" y2="47" class="d-wall"/><line x1="25" y1="47" x2="25" y2="69" class="d-wall"/><line x1="69" y1="47" x2="69" y2="69" class="d-wall"/><line x1="47" y1="69" x2="69" y2="69" class="d-wall"/><line x1="47" y1="69" x2="47" y2="91" class="d-wall"/><text x="14" y="14" class="d-letter">S</text><text x="80" y="80" class="d-letter">F</text><rect x="1.5" y="1.5" width="91" height="91" rx="3" class="d-border"/></svg><figcaption>Every room joined</figcaption></figure>
+        </div>
+
+        <h3>The steps</h3>
+        <ol class="info-steps">
+          <li><strong>Close every door.</strong> At the start, every square has a wall on all four sides.</li>
+          <li><strong>Start at S.</strong> The bright spark begins on the Start square.</li>
+          <li><strong>Pick a new square.</strong> The spark looks at the squares next to it that it has not visited yet. It picks one by chance and knocks down the wall in between.</li>
+          <li><strong>Keep digging.</strong> It does this again and again, making a long tunnel.</li>
+          <li><strong>Back up at a dead end.</strong> When there is no new square next to it, the spark walks back along its tunnel. It stops at the first square that still has a new neighbour, and digs a new branch from there.</li>
+          <li><strong>Stop when every square is visited.</strong> Now every room is joined to the rest of the maze.</li>
+        </ol>
+
+        <aside class="info-callout">
+          <div class="info-callout-label">Grown-up words</div>
+          <p>This way of building is called <strong>depth-first search</strong>. <em>Depth first</em> means the spark goes as deep as it can before it turns around. Walking back is called <strong>backtracking</strong>.</p>
+        </aside>
+
+        <h3>How it checks the maze is real</h3>
+        <ul class="info-checks">
+          <li><strong>No locked rooms.</strong> The spark visits every square, so there is always a way from S to F.</li>
+          <li><strong>Checked before you see it.</strong> The computer builds the whole maze in secret first. Then it measures the way from S to F. If the trip is too short, it throws that maze away and tries again. What you watch is a replay of a maze that passed the test.</li>
+          <li><strong>S and F stay apart.</strong> If S and F are next to each other, the wall between them is never knocked down. So you always have to go the long way round.</li>
+        </ul>
+
+        <h3>Easy, Medium and Hard</h3>
+        <p>Each level picks a size and sets three dials. You can move the dials yourself under <strong>Maze style</strong>.</p>
+        <dl class="info-terms">
+          <div><dt>Twisty</dt><dd>How often the tunnels turn. Straight tunnels are easier to follow.</dd></div>
+          <div><dt>Shortcuts</dt><dd>Extra holes in walls, so there is more than one way through. Shortcuts that would make the trip too short get put back.</dd></div>
+          <div><dt>Branches</dt><dd>A few long dead ends, or lots of short side paths.</dd></div>
+        </dl>
+        <p>Easy is small with shortcuts. Medium is the classic maze. Hard is big and very twisty.</p>
+
+        <button class="info-next" data-info="search">
+          <span><small>Next</small>How the search finds the way</span>
+          <span class="chevron" aria-hidden="true">›</span>
+        </button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="info-search" class="info-sheet" data-tint="cyan" aria-labelledby="info-search-title">
+    <div class="info-sheet-card">
+      <header class="info-sheet-header">
+        <span class="info-sheet-icon"><svg><use href="#i-route"></use></svg></span>
+        <h2 id="info-search-title">How the search finds the way</h2>
+        <button class="info-sheet-done" data-info-close>Done</button>
+      </header>
+      <div class="info-sheet-body" tabindex="-1">
+        <p class="info-lead">When you tap <strong>Discover the Path</strong>, the computer hunts for the shortest way from S to F. It can’t see the whole maze at once like you can. So it spreads out like a ripple in a pond.</p>
+
+        <div class="info-diagram info-diagram-two">
+          <figure><svg class="info-diagram-maze" viewBox="0 0 116 116" aria-hidden="true"><rect x="1.5" y="1.5" width="113" height="113" rx="3" class="d-path"/><rect x="3" y="3" width="22" height="22" class="d-explored"/><rect x="25" y="3" width="22" height="22" class="d-explored"/><rect x="47" y="3" width="22" height="22" class="d-explored"/><rect x="69" y="3" width="22" height="22" class="d-frontier"/><rect x="3" y="25" width="22" height="22" class="d-explored"/><rect x="47" y="25" width="22" height="22" class="d-frontier"/><rect x="3" y="47" width="22" height="22" class="d-explored"/><rect x="3" y="69" width="22" height="22" class="d-frontier"/><rect x="91" y="91" width="22" height="22" class="d-end"/><line x1="25" y1="25" x2="47" y2="25" class="d-wall"/><line x1="25" y1="25" x2="25" y2="47" class="d-wall"/><line x1="47" y1="25" x2="47" y2="47" class="d-wall"/><line x1="69" y1="25" x2="69" y2="47" class="d-wall"/><line x1="69" y1="47" x2="91" y2="47" class="d-wall"/><line x1="25" y1="47" x2="25" y2="69" class="d-wall"/><line x1="69" y1="69" x2="91" y2="69" class="d-wall"/><line x1="25" y1="69" x2="25" y2="91" class="d-wall"/><line x1="47" y1="69" x2="47" y2="91" class="d-wall"/><line x1="47" y1="91" x2="69" y2="91" class="d-wall"/><line x1="91" y1="69" x2="91" y2="91" class="d-wall"/><text x="14" y="14" class="d-num">0</text><text x="36" y="14" class="d-num">1</text><text x="58" y="14" class="d-num">2</text><text x="80" y="14" class="d-num">3</text><text x="14" y="36" class="d-num">1</text><text x="58" y="36" class="d-num">3</text><text x="14" y="58" class="d-num">2</text><text x="14" y="80" class="d-num">3</text><text x="102" y="102" class="d-letter">F</text><rect x="1.5" y="1.5" width="113" height="113" rx="3" class="d-border"/></svg><figcaption>The wave spreads</figcaption></figure>
+          <figure><svg class="info-diagram-maze" viewBox="0 0 116 116" aria-hidden="true"><rect x="1.5" y="1.5" width="113" height="113" rx="3" class="d-path"/><rect x="3" y="3" width="22" height="22" class="d-start"/><rect x="25" y="3" width="22" height="22" class="d-explored"/><rect x="47" y="3" width="22" height="22" class="d-explored"/><rect x="69" y="3" width="22" height="22" class="d-explored"/><rect x="91" y="3" width="22" height="22" class="d-explored"/><rect x="3" y="25" width="22" height="22" class="d-explored"/><rect x="25" y="25" width="22" height="22" class="d-explored"/><rect x="47" y="25" width="22" height="22" class="d-explored"/><rect x="69" y="25" width="22" height="22" class="d-explored"/><rect x="91" y="25" width="22" height="22" class="d-explored"/><rect x="3" y="47" width="22" height="22" class="d-explored"/><rect x="25" y="47" width="22" height="22" class="d-explored"/><rect x="47" y="47" width="22" height="22" class="d-explored"/><rect x="69" y="47" width="22" height="22" class="d-explored"/><rect x="91" y="47" width="22" height="22" class="d-explored"/><rect x="3" y="69" width="22" height="22" class="d-explored"/><rect x="25" y="69" width="22" height="22" class="d-explored"/><rect x="47" y="69" width="22" height="22" class="d-explored"/><rect x="69" y="69" width="22" height="22" class="d-explored"/><rect x="91" y="69" width="22" height="22" class="d-explored"/><rect x="3" y="91" width="22" height="22" class="d-explored"/><rect x="25" y="91" width="22" height="22" class="d-explored"/><rect x="47" y="91" width="22" height="22" class="d-explored"/><rect x="69" y="91" width="22" height="22" class="d-explored"/><rect x="91" y="91" width="22" height="22" class="d-end"/><line x1="25" y1="25" x2="47" y2="25" class="d-wall"/><line x1="25" y1="25" x2="25" y2="47" class="d-wall"/><line x1="47" y1="25" x2="47" y2="47" class="d-wall"/><line x1="69" y1="25" x2="69" y2="47" class="d-wall"/><line x1="69" y1="47" x2="91" y2="47" class="d-wall"/><line x1="25" y1="47" x2="25" y2="69" class="d-wall"/><line x1="69" y1="69" x2="91" y2="69" class="d-wall"/><line x1="25" y1="69" x2="25" y2="91" class="d-wall"/><line x1="47" y1="69" x2="47" y2="91" class="d-wall"/><line x1="47" y1="91" x2="69" y2="91" class="d-wall"/><line x1="91" y1="69" x2="91" y2="91" class="d-wall"/><polyline points="14,14 14,36 14,58 14,80 14,102 36,102 58,102 80,102 102,102" class="d-gold"/><text x="14" y="14" class="d-num">0</text><text x="36" y="14" class="d-num">1</text><text x="58" y="14" class="d-num">2</text><text x="80" y="14" class="d-num">3</text><text x="102" y="14" class="d-num">4</text><text x="14" y="36" class="d-num">1</text><text x="36" y="36" class="d-num">6</text><text x="58" y="36" class="d-num">3</text><text x="80" y="36" class="d-num">4</text><text x="102" y="36" class="d-num">5</text><text x="14" y="58" class="d-num">2</text><text x="36" y="58" class="d-num">5</text><text x="58" y="58" class="d-num">4</text><text x="80" y="58" class="d-num">5</text><text x="102" y="58" class="d-num">6</text><text x="14" y="80" class="d-num">3</text><text x="36" y="80" class="d-num">6</text><text x="58" y="80" class="d-num">5</text><text x="80" y="80" class="d-num">6</text><text x="102" y="80" class="d-num">7</text><text x="14" y="102" class="d-num">4</text><text x="36" y="102" class="d-num">5</text><text x="58" y="102" class="d-num">6</text><text x="80" y="102" class="d-num">7</text><text x="102" y="102" class="d-num">8</text><rect x="1.5" y="1.5" width="113" height="113" rx="3" class="d-border"/></svg><figcaption>Follow it back</figcaption></figure>
+        </div>
+        <p class="info-hint">The numbers show how many steps each square is from S.</p>
+
+        <h3>The steps</h3>
+        <ol class="info-steps">
+          <li><strong>Start at S.</strong> S is 0 steps away.</li>
+          <li><strong>Look one step out.</strong> Find every square you can reach in one step without crossing a wall. Those squares are 1 step away.</li>
+          <li><strong>Spread the wave.</strong> From those, find the squares 2 steps away, then 3, then 4. The wave grows one step at a time, in every direction at once. It flows around walls, just like water.</li>
+          <li><strong>Stop at F.</strong> As soon as the wave touches F, the search is done.</li>
+          <li><strong>Follow the trail back.</strong> Every square remembers which square the wave came from. The computer follows those clues from F back to S. That is the gold path.</li>
+        </ol>
+
+        <aside class="info-callout info-callout-gold">
+          <div class="info-callout-label">Why is gold the shortest?</div>
+          <p>The wave reaches every square 1 step away before any square 2 steps away. So the very first time it touches F, it has used the fewest steps possible.</p>
+        </aside>
+
+        <aside class="info-callout">
+          <div class="info-callout-label">Grown-up words</div>
+          <p>This is called <strong>breadth-first search</strong>, or <strong>BFS</strong>. <em>Breadth</em> means width. It searches wide, like a ripple, before it goes far.</p>
+        </aside>
+
+        <h3>Colours you will see</h3>
+        <ul class="info-colours">
+          <li><i class="swatch frontier"></i><span><strong>Frontier</strong> is the edge of the wave: the next squares to check.</span></li>
+          <li><i class="swatch visited"></i><span><strong>Explored</strong> squares were already checked. They stay blue so you can see every place the search tried.</span></li>
+          <li><i class="swatch solution"></i><span><strong>Shortest path</strong> is the one route the computer keeps.</span></li>
+        </ul>
+
+        <h3>The numbers</h3>
+        <dl class="info-terms">
+          <div><dt>Explored</dt><dd>How many squares the search has checked.</dd></div>
+          <div><dt>Frontier</dt><dd>How many squares are on the edge of the wave right now.</dd></div>
+          <div><dt>Distance</dt><dd>How many steps from S the wave has spread.</dd></div>
+          <div><dt>Shortest</dt><dd>How many steps the gold path takes from S to F.</dd></div>
+        </dl>
+
+        <p class="info-hint">Building goes <strong>deep</strong>: one long tunnel at a time. Searching goes <strong>wide</strong>: a ripple in every direction. If walls block every way to F, the wave runs out of squares and the search tells you there is no way through.</p>
+
+        <button class="info-next" data-info="solve">
+          <span><small>Next</small>Solve it yourself</span>
+          <span class="chevron" aria-hidden="true">›</span>
+        </button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="info-solve" class="info-sheet" data-tint="green" aria-labelledby="info-solve-title">
+    <div class="info-sheet-card">
+      <header class="info-sheet-header">
+        <span class="info-sheet-icon"><svg><use href="#i-pencil"></use></svg></span>
+        <h2 id="info-solve-title">Solve it yourself</h2>
+        <button class="info-sheet-done" data-info-close>Done</button>
+      </header>
+      <div class="info-sheet-body" tabindex="-1">
+        <p class="info-lead">Can you find the way? Use your Apple Pencil or your finger to draw a line from S to F.</p>
+
+        <h3>How to play</h3>
+        <ol class="info-steps">
+          <li><strong>Tap Solve It Yourself.</strong></li>
+          <li><strong>Put your Pencil or finger on S.</strong></li>
+          <li><strong>Draw to F.</strong> Stay in the open paths. You can’t go through walls or jump over squares.</li>
+          <li><strong>Lifted by mistake?</strong> No problem. Your line waits for you and the clock stops. Touch the end of your line to keep going.</li>
+          <li><strong>Wrong way?</strong> Go back along your line and it rubs out.</li>
+        </ol>
+
+        <h3 id="info-solve-score">Your score</h3>
+        <dl class="info-terms">
+          <div><dt>Time</dt><dd>How long you took. The clock stops while your Pencil is lifted.</dd></div>
+          <div><dt>Cells</dt><dd>Every square you step on, starting with S. Going back counts too, because you still walked there.</dd></div>
+          <div><dt>Best</dt><dd>The fewest squares it takes to get from S to F. The computer finds this with its search wave before you start.</dd></div>
+          <div><dt>Efficiency</dt><dd>Best divided by Cells. Walk the shortest way and you get 100%: a Perfect Route!</dd></div>
+          <div><dt>Backtracks</dt><dd>How many times you went back. That’s fine. Every explorer does it!</dd></div>
+        </dl>
+
+        <aside class="info-callout info-callout-green">
+          <div class="info-callout-label">For example</div>
+          <p>Best is 20 and your Cells count is 25. 20 ÷ 25 = 0.8, so your efficiency is 80%. Try again and see if you can reach 100%!</p>
+        </aside>
+
+        <button class="info-next" data-info="grow">
+          <span><small>Back to the start</small>How a maze grows</span>
+          <span class="chevron" aria-hidden="true">›</span>
+        </button>
+      </div>
+    </div>
+  </dialog>
 
   <script>
     // Safety net for a stuck offline copy. Every version of the service worker
