@@ -978,6 +978,12 @@ With edge walls every square is traversable, so S and F can be placed on any squ
 
 ---
 
+## 40a. Build and Solve mode
+
+A remembered setting (`simple` in `mazeBuilder.settings`) for children who cannot read. Full mode is the default. One tap on the smiley button turns it on; leaving takes a press and hold on the corner button, so a toddler cannot leave by accident. While it is on, `html.simple-mode` hides every word, setting and metric; a maze grows on its own and drawing starts straight after, with S (or the end of a lifted line) pulsing as the only cue. The success sheet shows pictures only. Keep this mode free of text the child must read, and give any new full-mode feature a thought here too.
+
+---
+
 # PRINTING
 
 ## 41. Print mode is a real feature
@@ -1273,6 +1279,7 @@ New features must coexist with:
 - BFS discovery animation
 - instant solve
 - self-solve/Pencil mode
+- Build and Solve (picture-only) mode
 - wall editing
 - Start/Finish editing
 - printing
