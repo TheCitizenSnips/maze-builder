@@ -28,6 +28,11 @@
   const speedSelect = byId('speedSelect');
   const levelButtons = [...document.querySelectorAll('.level-picker .segment')];
   const levelLabel = byId('levelLabel');
+  const shapePicker = byId('shapePicker');
+  const shapeIcon = byId('shapeIcon');
+  const shapeLabel = byId('shapeLabel');
+  // The shape pictures and masks come from shapes.js, loaded just before.
+  const Shapes = window.MazeShapes;
   const dials = {
     twisty: byId('twistyDial'),
     shortcuts: byId('shortcutsDial'),
@@ -99,7 +104,7 @@
   // shows a message instead of reloading forever.
   const FRESH_PARAM = 'fresh';
   const pageUrl = new URL(location.href);
-  if (missingIds.length || !levelButtons.length || mixedReleases) {
+  if (missingIds.length || !levelButtons.length || !Shapes || mixedReleases) {
     // Offline, the saved copy is all there is, so it is kept and the message
     // below asks for a reopen later instead.
     if (!pageUrl.searchParams.has(FRESH_PARAM) && navigator.onLine !== false) {
@@ -110,7 +115,7 @@
       forgetOfflineCopy().then(() => location.replace(pageUrl.href));
     } else {
       console.warn('Maze Builder page and script are from different releases; missing:',
-        missingIds.join(', ') || (mixedReleases ? `none (page ${pageBuild}, script ${BUILD})` : 'level picker'));
+        missingIds.join(', ') || (mixedReleases ? `none (page ${pageBuild}, script ${BUILD})` : !Shapes ? 'shapes.js' : 'level picker'));
       if (statusEl) statusEl.textContent = 'Maze Builder just updated. Close it and open it again to finish.';
     }
     return;
@@ -120,16 +125,26 @@
     history.replaceState(history.state, '', pageUrl.href);
   }
 
-  // Settings a child picked last time (size, speed and maze style) come back
+  // The maze shape lives in the script rather than a form control, so it gets
+  // a small stand-in with the same value property the settings code uses.
+  let shapeId = 'square';
+  const shapeControl = {
+    get value() { return shapeId; },
+    set value(id) { shapeId = id; },
+    isValid: id => Shapes.has(id)
+  };
+
+  // Settings a child picked last time (size, speed, shape and maze style) come back
   // on the next visit. Only the choices are remembered, never the maze itself.
   // Storage can be missing or blocked (private browsing), so every access is
   // guarded.
   const SETTINGS_KEY = 'mazeBuilder.settings';
-  const rememberedControls = { size: sizeSelect, speed: speedSelect, ...dials };
+  const rememberedControls = { size: sizeSelect, speed: speedSelect, shape: shapeControl, ...dials };
 
   // A saved value only comes back if the control can still show it: a
   // listed option for a menu, a whole step within range for a dial.
   function isValidSetting(control, value) {
+    if (control.isValid) return control.isValid(value);
     if (control.tagName === 'SELECT') return [...control.options].some(option => option.value === value);
     const n = Number(value);
     return Number.isInteger(n) && n >= Number(control.min) && n <= Number(control.max);
@@ -164,6 +179,10 @@
 
   let size = Number(sizeSelect.value);
   let grid = [];
+  // mask[r][c] is true for the squares inside the maze's shape. A square
+  // grid is all inside; other shapes leave the squares around them out.
+  let mask = [];
+  let insideCount = 0;
   let walls = { right: [], bottom: [] };
   let wallEls = { right: [], bottom: [] };
   let start = null;
@@ -285,7 +304,7 @@
   // more steps to grow. Quicken each step as the grid grows so a large maze
   // still finishes while a child is watching; small mazes keep full speed.
   function growthDelay() {
-    return currentDelay() * Math.min(1, Math.sqrt(121 / (size * size)));
+    return currentDelay() * Math.min(1, Math.sqrt(121 / insideCount));
   }
 
   // On a phone or portrait iPad the controls sit above the maze, so the
@@ -317,6 +336,7 @@
     sizeSelect.disabled = disabled;
     for (const btn of levelButtons) btn.disabled = disabled;
     for (const dial of Object.values(dials)) dial.disabled = disabled;
+    for (const tile of shapePicker.children) tile.disabled = disabled;
     buttons.draw.disabled = disabled;
     buttons.start.disabled = disabled;
     buttons.end.disabled = disabled;
@@ -405,6 +425,40 @@
     setStatus(`${level.label} is set. Tap Grow a Maze to build one.`, 'Ready');
   }
 
+  // Shape picker: one picture tile per shape, so a child who cannot read
+  // yet can still choose the cat. The row above the tiles shows the current
+  // shape's picture and name.
+  function buildShapePicker() {
+    for (const { id, label } of Shapes.list) {
+      const tile = document.createElement('button');
+      tile.type = 'button';
+      tile.className = 'shape-tile';
+      tile.dataset.shape = id;
+      tile.setAttribute('role', 'radio');
+      tile.setAttribute('aria-label', label);
+      tile.title = label;
+      tile.innerHTML = Shapes.svg(id);
+      tile.addEventListener('click', () => applyShape(id));
+      shapePicker.appendChild(tile);
+    }
+  }
+
+  function syncShapeUI() {
+    for (const tile of shapePicker.children) {
+      tile.setAttribute('aria-checked', String(tile.dataset.shape === shapeId));
+    }
+    shapeIcon.innerHTML = Shapes.svg(shapeId).replace(/shape-mask-/g, 'shape-icon-mask-');
+    shapeLabel.textContent = Shapes.label(shapeId);
+  }
+
+  function applyShape(id) {
+    if (running || id === shapeId) return;
+    shapeId = id;
+    saveSettings();
+    syncShapeUI();
+    makeBlankGrid();
+  }
+
   function makeBlankGrid() {
     cancelAnimation();
     exitUserSolveMode(false);
@@ -413,29 +467,57 @@
     grid = Array.from({ length: size }, () =>
       Array.from({ length: size }, () => createCellState())
     );
+    useShapeMask();
     walls = makeWalls(false);
 
-    start = { r: 0, c: 0 };
-    end = { r: size - 1, c: size - 1 };
+    ({ start, end } = Shapes.ends(shapeId, size));
 
     render();
     resetMetrics();
-    setStatus('Draw walls along the grid lines, or grow a maze from scratch.', 'Ready');
+    setStatus(shapeId === 'square'
+      ? 'Draw walls along the grid lines, or grow a maze from scratch.'
+      : `${Shapes.label(shapeId)} shape. Grow a maze to fill it, or draw your own walls inside.`, 'Ready');
+  }
+
+  // The mask for the chosen shape at this size. Squares outside it are not
+  // part of the maze: no route, search or wall can use them.
+  function useShapeMask() {
+    mask = Shapes.mask(shapeId, size);
+    insideCount = mask.reduce((sum, row) => sum + row.filter(Boolean).length, 0);
+  }
+
+  function isShaped() {
+    return shapeId !== 'square';
   }
 
   // Walls sit on the edges between squares, like cell borders in a
   // spreadsheet, so every square is open path. right[r][c] is the edge
   // between (r, c) and (r, c + 1); bottom[r][c] is the edge between (r, c)
   // and (r + 1, c). The outside of the grid is always a wall.
+  // An edge that touches a square outside the shape is always a wall: the
+  // shape's outline is the maze's outside wall.
   function makeWalls(value) {
     return {
-      right: Array.from({ length: size }, () => Array(size - 1).fill(value)),
-      bottom: Array.from({ length: size - 1 }, () => Array(size).fill(value))
+      right: Array.from({ length: size }, (_, r) =>
+        Array.from({ length: size - 1 }, (_, c) => value || !mask[r][c] || !mask[r][c + 1])),
+      bottom: Array.from({ length: size - 1 }, (_, r) =>
+        Array.from({ length: size }, (_, c) => value || !mask[r][c] || !mask[r + 1][c]))
     };
   }
 
   function inBounds(p) {
     return p.r >= 0 && p.c >= 0 && p.r < size && p.c < size;
+  }
+
+  function isInside(p) {
+    return inBounds(p) && mask[p.r][p.c];
+  }
+
+  // Part of the shape's outline, or out beyond it: never drawn or erased.
+  function isFixedEdge(edge) {
+    const a = { r: edge.r, c: edge.c };
+    const b = edge.side === 'right' ? { r: edge.r, c: edge.c + 1 } : { r: edge.r + 1, c: edge.c };
+    return !isInside(a) || !isInside(b);
   }
 
   // The edge shared by two orthogonally adjacent squares, or null.
@@ -451,7 +533,7 @@
 
   // The one movement rule every mode shares: one square across an open edge.
   function canMove(a, b) {
-    if (!inBounds(a) || !inBounds(b)) return false;
+    if (!isInside(a) || !isInside(b)) return false;
     const edge = edgeBetween(a, b);
     return Boolean(edge) && !hasWall(edge);
   }
@@ -491,17 +573,42 @@
           line.setAttribute('data-r', r);
           line.setAttribute('data-c', c);
           if (on) line.classList.add('on');
+          if (isFixedEdge({ side, r, c })) line.classList.add('fixed');
           frag.appendChild(line);
           return line;
         });
       });
     }
 
+    if (isShaped()) frag.appendChild(shapeOutline());
     wallLayer.appendChild(frag);
+  }
+
+  // The shape's outline as one path along every edge between a square inside
+  // the shape and one outside it (or the grid's edge). A square grid uses
+  // the maze border instead.
+  function shapeOutline() {
+    const path = document.createElementNS(SVG_NS, 'path');
+    path.setAttribute('class', 'shape-outline');
+    path.setAttribute('d', shapeOutlinePath());
+    return path;
+  }
+
+  // The outline as SVG path data, `unit` long per square.
+  function shapeOutlinePath(unit = 1) {
+    let d = '';
+    for (let r = 0; r <= size; r++) {
+      for (let c = 0; c <= size; c++) {
+        if (c < size && isInside({ r: r - 1, c }) !== isInside({ r, c })) d += `M${c * unit} ${r * unit}h${unit}`;
+        if (r < size && isInside({ r, c: c - 1 }) !== isInside({ r, c })) d += `M${c * unit} ${r * unit}v${unit}`;
+      }
+    }
+    return d;
   }
 
   function render() {
     mazeStage.style.setProperty('--grid-size', size);
+    mazeStage.classList.toggle('shaped', isShaped());
     mazeEl.innerHTML = '';
     renderWalls();
 
@@ -525,6 +632,10 @@
 
     const data = grid[r][c];
     cellEl.className = 'cell';
+    if (!mask[r][c]) {
+      cellEl.classList.add('off');
+      return;
+    }
 
     if (data.carveTrail) cellEl.classList.add('carve-trail');
     if (data.carveSpark) cellEl.classList.add('carve-spark');
@@ -596,6 +707,11 @@
   function placeMarker(p) {
     const isStart = start && start.r === p.r && start.c === p.c;
     const isEnd = end && end.r === p.r && end.c === p.c;
+
+    if (!isInside(p)) {
+      setStatus('That square is outside the shape. Pick a square inside it.', 'Editing');
+      return;
+    }
 
     // S and E sharing a square would make a maze with nothing to solve.
     if ((mode === 'start' && isEnd) || (mode === 'end' && isStart)) {
@@ -674,8 +790,10 @@
 
     e.preventDefault();
     const edge = pointEdge(e.clientX, e.clientY, geo);
-    if (!edge) {
-      setStatus('The outside wall is always there. Draw along the lines inside the maze.', 'Editing');
+    if (!edge || isFixedEdge(edge)) {
+      setStatus(isShaped()
+        ? 'The outline of the shape is always a wall. Draw along the lines inside it.'
+        : 'The outside wall is always there. Draw along the lines inside the maze.', 'Editing');
       return;
     }
 
@@ -701,7 +819,7 @@
 
     for (let i = 1; i <= steps; i++) {
       const edge = pointEdge(from.x + dx * i / steps, from.y + dy * i / steps, geo);
-      if (!edge || edge.dist > 0.3 || edge.cross < 0.25 || edgeKey(edge) === lastPainted) continue;
+      if (!edge || edge.dist > 0.3 || edge.cross < 0.25 || edgeKey(edge) === lastPainted || isFixedEdge(edge)) continue;
       paintEdge(edge, false);
     }
 
@@ -742,7 +860,11 @@
   //   shortcut the Shortcuts dial opens the wall between `a` and `b`
   // Each carve, move and rest step also records the carved count and stack
   // depth at that moment, for the live telemetry.
-  function planMaze(n, style, from, to, minRoute = 0, { giveUpWhenShort = false } = {}) {
+  //
+  // `shape` is the mask of squares the maze fills (all of them when left
+  // out). The tip only ever carves into squares inside it, so the outline
+  // stays a wall and the maze fills the shape exactly.
+  function planMaze(n, style, from, to, minRoute = 0, { giveUpWhenShort = false, shape = null } = {}) {
     const straightWeight = STRAIGHT_WEIGHT[style.twisty];
     const branchChance = BRANCH_CHANCE[style.branches];
     const steps = [];
@@ -750,7 +872,7 @@
       right: Array.from({ length: n }, () => Array(n - 1).fill(true)),
       bottom: Array.from({ length: n - 1 }, () => Array(n).fill(true))
     };
-    const inside = p => p.r >= 0 && p.c >= 0 && p.r < n && p.c < n;
+    const inside = p => p.r >= 0 && p.c >= 0 && p.r < n && p.c < n && (!shape || shape[p.r][p.c]);
     const near = p => [[1,0],[-1,0],[0,1],[0,-1]]
       .map(([dr, dc]) => ({ r: p.r + dr, c: p.c + dc }))
       .filter(inside);
@@ -867,13 +989,14 @@
     // tried, so shortcuts never turn the maze into a short hop.
     const pick = list => list[Math.floor(Math.random() * list.length)];
     const refused = new Set();
-    const closedSides = p => near(p).filter(q =>
+    const closedSides = p => !inside(p) ? [] : near(p).filter(q =>
       !isOpen(p, q) && !direct(p, q) && !refused.has(edgeKey(edgeBetween(p, q)))
     );
     const openCount = Array.from({ length: n }, (_, r) =>
       Array.from({ length: n }, (_, c) => near({ r, c }).filter(q => isOpen({ r, c }, q)).length)
     );
-    const shortcuts = Math.round(SHORTCUT_SHARE[style.shortcuts] * n * n);
+    const squares = shape ? shape.flat().filter(Boolean).length : n * n;
+    const shortcuts = Math.round(SHORTCUT_SHARE[style.shortcuts] * squares);
     for (let i = 0; i < shortcuts; i++) {
       for (let tries = 0; tries < 12; tries++) {
         const deadEnds = [];
@@ -937,16 +1060,19 @@
     return -1;
   }
 
-  // How long the S-to-E route usually is when S and E sit in opposite
-  // corners, for this size and Maze style. Worked out once per setting from
-  // a handful of sample plans, so it follows the level and the dials.
+  // How long the S-to-E route usually is when S and E sit where a fresh
+  // grid puts them (opposite corners of a square, far ends of a shape), for
+  // this size, shape and Maze style. Worked out once per setting from a
+  // handful of sample plans, so it follows the level and the dials.
   const cornerRouteCache = new Map();
-  function typicalCornerRoute(n, style) {
-    const cacheKey = `${n}:${style.twisty}:${style.shortcuts}:${style.branches}`;
+  function typicalCornerRoute(n, style, shapeName) {
+    const cacheKey = `${n}:${shapeName}:${style.twisty}:${style.shortcuts}:${style.branches}`;
     if (!cornerRouteCache.has(cacheKey)) {
+      const shape = Shapes.mask(shapeName, n);
+      const ends = Shapes.ends(shapeName, n);
       const routes = [];
       for (let i = 0; i < 9; i++) {
-        routes.push(planMaze(n, style, { r: 0, c: 0 }, { r: n - 1, c: n - 1 }).route);
+        routes.push(planMaze(n, style, ends.start, ends.end, 0, { shape }).route);
       }
       routes.sort((a, b) => a - b);
       cornerRouteCache.set(cacheKey, routes[Math.floor(routes.length / 2)]);
@@ -962,13 +1088,14 @@
   // settles for the next maze, whatever its route.
   const PLAN_BUDGET_MS = 150;
   function planLongMaze(n, style, from, to) {
-    const wanted = Math.floor(typicalCornerRoute(n, style) / 2);
+    const shape = Shapes.mask(shapeId, n);
+    const wanted = Math.floor(typicalCornerRoute(n, style, shapeId) / 2);
     const startedAt = performance.now();
     do {
-      const plan = planMaze(n, style, from, to, wanted, { giveUpWhenShort: true });
+      const plan = planMaze(n, style, from, to, wanted, { giveUpWhenShort: true, shape });
       if (!plan.short) return plan;
     } while (performance.now() - startedAt < PLAN_BUDGET_MS);
-    return planMaze(n, style, from, to, wanted);
+    return planMaze(n, style, from, to, wanted, { shape });
   }
 
   // How long Super fast takes to play a whole maze, after planning.
@@ -997,7 +1124,7 @@
     render();
     bringMazeIntoView();
 
-    const totalTargets = size * size;
+    const totalTargets = insideCount;
     const showGrowthMetrics = step => setMetrics({
       progress: `${Math.min(100, Math.round(step.carved / totalTargets * 100))}%`,
       explored: String(step.carved),
@@ -1273,7 +1400,7 @@
 
     setStatus('A search wave is spreading from the start. The bright edge is the frontier.', 'Searching');
 
-    const totalOpen = size * size;
+    const totalOpen = insideCount;
 
     for (let d = 0; d < result.layers.length; d++) {
       if (!running || myRunId !== runId) return;
@@ -2223,16 +2350,26 @@
       }
     }
 
+    // Faint grid lines between squares inside the shape, and the walls.
+    const gridLines = new Path2D();
+    const wallLines = new Path2D();
+    for (let r = 0; r < size; r++) {
+      for (let c = 0; c < size; c++) {
+        for (const side of ['right', 'bottom']) {
+          const edge = { side, r, c };
+          if ((side === 'right' ? c === size - 1 : r === size - 1) || isFixedEdge(edge)) continue;
+          const x = side === 'right' ? c + 1 : c;
+          const y = side === 'right' ? r : r + 1;
+          for (const lines of hasWall(edge) ? [gridLines, wallLines] : [gridLines]) {
+            lines.moveTo(x * cell, y * cell);
+            lines.lineTo((side === 'right' ? x : x + 1) * cell, (side === 'right' ? y + 1 : y) * cell);
+          }
+        }
+      }
+    }
     ctx.strokeStyle = '#ececf1';
     ctx.lineWidth = 1;
-    ctx.beginPath();
-    for (let i = 1; i < size; i++) {
-      ctx.moveTo(i * cell, 0);
-      ctx.lineTo(i * cell, side);
-      ctx.moveTo(0, i * cell);
-      ctx.lineTo(side, i * cell);
-    }
-    ctx.stroke();
+    ctx.stroke(gridLines);
 
     for (const [spot, ring, fallback, ink] of [[start, '#30d158', 'S', '#248a3d'], [end, '#ff453a', 'E', '#d70015']]) {
       if (!spot) continue;
@@ -2253,24 +2390,18 @@
     ctx.strokeStyle = '#1c2b4f';
     ctx.lineCap = 'square';
     ctx.lineWidth = cell * 0.1;
-    ctx.beginPath();
-    for (let r = 0; r < size; r++) {
-      for (let c = 0; c < size; c++) {
-        if (walls.right[r] && walls.right[r][c]) {
-          ctx.moveTo((c + 1) * cell, r * cell);
-          ctx.lineTo((c + 1) * cell, (r + 1) * cell);
-        }
-        if (walls.bottom[r] && walls.bottom[r][c]) {
-          ctx.moveTo(c * cell, (r + 1) * cell);
-          ctx.lineTo((c + 1) * cell, (r + 1) * cell);
-        }
-      }
-    }
-    ctx.stroke();
+    ctx.stroke(wallLines);
 
-    ctx.lineCap = 'butt';
     ctx.lineWidth = border;
-    ctx.strokeRect(-border / 2, -border / 2, side + border, side + border);
+    if (isShaped()) {
+      // The same outline the screen draws.
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.stroke(new Path2D(shapeOutlinePath(cell)));
+    } else {
+      ctx.lineCap = 'butt';
+      ctx.strokeRect(-border / 2, -border / 2, side + border, side + border);
+    }
 
     const bytes = atob(canvas.toDataURL('image/png').split(',')[1]);
     const png = new Uint8Array(bytes.length);
@@ -2336,6 +2467,8 @@
 
   useAlgorithmMetricLabels();
   showRelease();
+  buildShapePicker();
+  syncShapeUI();
   syncLevelUI();
   makeBlankGrid();
   window.addEventListener('load', registerServiceWorker);

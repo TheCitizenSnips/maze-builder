@@ -56,6 +56,21 @@ When the route reaches the finish:
 
 A 100% result means the player matched the mathematically shortest route.
 
+## Shapes
+
+Under **Shape** in the Maze card, picture tiles pick the outline the maze
+grows in: a plain square, or one of 15 pictures (heart, star, house, castle,
+rocket, tree, robot, cat, dog, bunny, fish, turtle, elephant, dinosaur,
+butterfly). The choice is remembered like the size and speed.
+
+Each picture is drawn once as a few simple vector parts in `shapes.js` and
+turned into a mask of squares for whichever size is picked, so the same cat
+works from 11 × 11 to 25 × 25. Small details such as eyes or a door only
+appear once the grid is big enough to show them. Every mask is one connected
+piece; the outline is the outside wall, and growing, searching, solving and
+drawing walls all stay inside it. Start and Finish begin far apart inside the
+shape and can still be moved.
+
 ## Learn how it works
 
 Small ⓘ buttons open reading sheets written for children under 12:

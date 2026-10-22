@@ -57,6 +57,7 @@ The project intentionally uses a very small static web stack:
 - `index.html`
 - `styles.css`
 - `app.js`
+- `shapes.js` (maze shape pictures and masks, loaded before `app.js`)
 - `manifest.webmanifest`
 - `service-worker.js`
 - `.nojekyll`
@@ -164,6 +165,7 @@ Expected structure:
 ├── index.html
 ├── styles.css
 ├── app.js
+├── shapes.js
 ├── manifest.webmanifest
 ├── service-worker.js
 └── icons/
@@ -428,6 +430,10 @@ Conceptually:
 7. continue until every square has been visited
 
 Generated mazes should remain valid and connected.
+
+### Shaped mazes
+
+A maze can fill a picture instead of the whole square (Shape tiles in the Maze card). `shapes.js` draws each picture as a few vector parts in a 100 × 100 box and rasterizes it to a mask for each grid size; parts with `min`/`max` appear only on bigger or smaller grids. Every mask must be one side-to-side connected piece at 11, 15, 21 and 25 (`tests/shapes.spec.js` checks this). Squares outside the mask are not part of the maze: every edge touching one is a fixed wall, `canMove` refuses them, the generator never carves into them, and the outline is drawn as the outer wall. Start and Finish default to far-apart squares inside the shape (`MazeShapes.ends`), which for the square grid are the usual corners.
 
 Growing a maze keeps Start and Finish wherever they are; only changing the size puts them back in the corners. The whole maze is planned before the animation plays, so the planner can check the S-to-F route: it never opens the wall between side-by-side S and F, shortcuts that would cut the route below half a typical corner-to-corner route for the level are skipped, and a plan whose corridors join S and F too soon is replaced. Keep algorithm logic in the planner and visuals in the playback.
 

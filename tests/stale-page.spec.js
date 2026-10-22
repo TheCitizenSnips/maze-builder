@@ -136,7 +136,7 @@ test.describe('A page older than the script', () => {
       await page.reload();
       expect(await page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
 
-      for (const file of ['index.html', 'app.js', 'styles.css']) {
+      for (const file of ['index.html', 'shapes.js', 'app.js', 'styles.css']) {
         fs.copyFileSync(path.join(repo, file), path.join(site, file));
       }
       const errors = collectErrors(page);
