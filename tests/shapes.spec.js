@@ -212,6 +212,9 @@ test.describe('Shaped mazes', () => {
   test('shapes start at 15 × 15: smaller grids are square', async ({ page }) => {
     expect(Shapes.minSize).toBe(15);
     await openApp(page, { size: 11 });
+    await page.click('#shapeDetails summary');
+    // Only a grid too small for pictures explains the size rule.
+    await expect(page.locator('#shapeNote')).toBeVisible();
 
     // Picking a shape on 11 × 11 grows the grid to 15 × 15.
     await pickShape(page, 'star');
@@ -219,6 +222,13 @@ test.describe('Shaped mazes', () => {
     await expect(page.locator('#maze .cell')).toHaveCount(15 * 15);
     await expect(page.locator('#maze .cell.off')).toHaveCount(15 * 15 - insideCount(Shapes.mask('star', 15)));
     await expect(page.locator('#status')).toContainText('15 × 15');
+    await expect(page.locator('#shapeNote')).toBeHidden();
+    for (const n of [21, 25, 15]) {
+      await setSize(page, n);
+      await expect(page.locator('#shapeLabel')).toHaveText('Star');
+      await expect(page.locator('#shapeNote')).toBeHidden();
+      await expect(page.locator('#status')).not.toContainText('square');
+    }
 
     // Going back down to 11 × 11, by size or by Easy, makes it a square again.
     await setSize(page, 11);

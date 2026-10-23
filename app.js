@@ -31,6 +31,7 @@
   const shapePicker = byId('shapePicker');
   const shapeIcon = byId('shapeIcon');
   const shapeLabel = byId('shapeLabel');
+  const shapeNote = byId('shapeNote');
   // The shape pictures and masks come from shapes.js, loaded just before.
   const Shapes = window.MazeShapes;
   const dials = {
@@ -81,6 +82,10 @@
   const fullModeBtn = byId('fullModeBtn');
   const simpleGrowBtn = byId('simpleGrowBtn');
   const simpleSolveBtn = byId('simpleSolveBtn');
+  const simpleShapeBtn = byId('simpleShapeBtn');
+  const simpleShapeIcon = byId('simpleShapeIcon');
+  const simpleShapeSheet = byId('simpleShapeSheet');
+  const simpleShapePicker = byId('simpleShapePicker');
 
   const buttons = {
     draw: byId('drawBtn'),
@@ -464,12 +469,55 @@
     }
   }
 
+  // Each copy of a picture gets its own mask ids: a mask inside a hidden
+  // panel (the sidebar in Build and Solve) would blank every copy using it.
+  const shapeSvg = (id, prefix) => Shapes.svg(id).replace(/shape-mask-/g, `${prefix}-mask-`);
+
+  // Build and Solve's shape picker: the same pictures as big tiles. One tap
+  // on a tile grows a maze in that shape straight away.
+  function buildSimpleShapePicker() {
+    for (const { id, label } of Shapes.list) {
+      const tile = document.createElement('button');
+      tile.type = 'button';
+      tile.className = 'simple-shape-tile';
+      tile.dataset.shape = id;
+      tile.setAttribute('role', 'radio');
+      tile.setAttribute('aria-label', label);
+      tile.innerHTML = shapeSvg(id, 'simple-shape');
+      tile.addEventListener('click', () => growSimpleShape(id));
+      simpleShapePicker.appendChild(tile);
+    }
+  }
+
+  function openSimpleShapes() {
+    simpleShapeSheet.hidden = false;
+    simpleShapeBtn.setAttribute('aria-expanded', 'true');
+    const current = simpleShapePicker.querySelector('[aria-checked="true"]');
+    if (current) current.focus({ preventScroll: true });
+  }
+
+  function closeSimpleShapes() {
+    simpleShapeSheet.hidden = true;
+    simpleShapeBtn.setAttribute('aria-expanded', 'false');
+  }
+
+  function growSimpleShape(id) {
+    closeSimpleShapes();
+    // A child may pick while a maze is still growing; start over in the new shape.
+    if (running) cancelAnimation();
+    applyShape(id);
+    animateMazeGrowth();
+  }
+
   function syncShapeUI() {
-    for (const tile of shapePicker.children) {
+    for (const tile of [...shapePicker.children, ...simpleShapePicker.children]) {
       tile.setAttribute('aria-checked', String(tile.dataset.shape === shapeId));
     }
-    shapeIcon.innerHTML = Shapes.svg(shapeId).replace(/shape-mask-/g, 'shape-icon-mask-');
+    simpleShapeIcon.innerHTML = shapeSvg(shapeId, 'simple-icon');
+    shapeIcon.innerHTML = shapeSvg(shapeId, 'shape-icon');
     shapeLabel.textContent = Shapes.label(shapeId);
+    // Only a grid too small for pictures explains the size rule.
+    shapeNote.hidden = size >= Shapes.minSize;
   }
 
   // A picture needs at least Shapes.minSize squares across, so picking one
@@ -513,6 +561,7 @@
       Array.from({ length: size }, () => createCellState())
     );
     useShapeMask();
+    syncShapeUI();
     walls = makeWalls(false);
 
     ({ start, end } = Shapes.ends(shapeId, size));
@@ -2394,6 +2443,7 @@
   }
 
   function exitSimpleMode() {
+    closeSimpleShapes();
     simpleMode = false;
     syncSimpleModeUI();
     saveSettings();
@@ -2428,6 +2478,14 @@
   });
 
   simpleGrowBtn.addEventListener('click', animateMazeGrowth);
+  simpleShapeBtn.addEventListener('click', () => {
+    if (simpleShapeSheet.hidden) openSimpleShapes();
+    else closeSimpleShapes();
+  });
+  simpleShapeSheet.querySelector('[data-close-shapes]').addEventListener('click', closeSimpleShapes);
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !simpleShapeSheet.hidden) closeSimpleShapes();
+  });
   simpleSolveBtn.addEventListener('click', () => {
     if (running) return;
     if (userSolveMode) resetUserAttempt();
@@ -2600,6 +2658,7 @@
   useAlgorithmMetricLabels();
   showRelease();
   buildShapePicker();
+  buildSimpleShapePicker();
   // Saved settings from before shapes had a smallest size.
   fitShapeToSize();
   syncShapeUI();

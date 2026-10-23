@@ -98,7 +98,7 @@
             </summary>
 
             <div id="shapePicker" class="shape-picker" role="radiogroup" aria-label="Maze shape"></div>
-            <p class="dial-note shape-note">Shapes need a 15 × 15 grid or bigger. Picking one on a smaller grid makes it 15 × 15.</p>
+            <p id="shapeNote" class="dial-note shape-note" hidden>This grid is too small for a picture. Pick one and the grid grows to 15 × 15.</p>
           </details>
 
           <details id="styleDetails" class="style-details">
@@ -283,6 +283,13 @@
         <div class="simple-bar" role="group" aria-label="Play">
           <button id="simpleGrowBtn" class="simple-action grow" aria-label="Grow a new maze"><svg><use href="#i-spark"></use></svg></button>
           <button id="simpleSolveBtn" class="simple-action solve" aria-label="Draw your way through"><svg><use href="#i-pencil"></use></svg></button>
+          <button id="simpleShapeBtn" class="simple-action shape" aria-label="Pick a shape" aria-haspopup="true" aria-expanded="false"><span id="simpleShapeIcon" class="simple-shape-icon"></span></button>
+        </div>
+
+        <!-- Build and Solve shape picker: big picture tiles; one tap grows that shape. -->
+        <div id="simpleShapeSheet" class="simple-shape-sheet" hidden>
+          <div class="simple-shape-backdrop" data-close-shapes></div>
+          <div id="simpleShapePicker" class="simple-shape-picker" role="radiogroup" aria-label="Pick a shape"></div>
         </div>
 
         <div id="successSheet" class="success-sheet" hidden>
