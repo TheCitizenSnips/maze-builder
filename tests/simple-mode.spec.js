@@ -1,7 +1,8 @@
 const { test, expect } = require('@playwright/test');
 const {
-  openApp, readMaze, shortestPath, makePointer, defaultPointerType, traceCells, cellCenter
+  openApp, readMaze, shortestPath, makePointer, defaultPointerType, traceCells, cellCenter, cell
 } = require('./helpers');
+const Shapes = require('../shapes.js');
 
 // Build and Solve: the picture-only mode for children who cannot read yet.
 
@@ -31,6 +32,7 @@ test.describe('Build and Solve mode', () => {
     await expect(page.locator('.sidebar')).toBeVisible();
     await expect(page.locator('#fullModeBtn')).toBeHidden();
     await expect(page.locator('.simple-bar')).toBeHidden();
+    await expect(page.locator('#simpleShapeBtn')).toBeHidden();
 
     await enterSimpleMode(page);
 
@@ -40,6 +42,7 @@ test.describe('Build and Solve mode', () => {
     }
     await expect(page.locator('#simpleGrowBtn')).toBeVisible();
     await expect(page.locator('#simpleSolveBtn')).toBeVisible();
+    await expect(page.locator('#simpleShapeBtn')).toBeVisible();
     await expect(page.locator('#fullModeBtn')).toBeVisible();
 
     // The maze grows by itself, then drawing starts with S glowing.
@@ -178,5 +181,52 @@ test.describe('Build and Solve mode', () => {
     await page.reload();
     await expect(page.locator('#sizeSelect')).toHaveValue('21');
     await expect(page.locator('#speedSelect option:checked')).toHaveText('Super fast');
+  });
+
+  test('a child picks an animal from big pictures and a maze grows in that shape', async ({ page }) => {
+    await openApp(page, { size: 11, speed: 'Super fast' });
+    await enterSimpleMode(page);
+    await waitForYourTurn(page);
+
+    // One tap opens the pictures; tapping outside them closes them again.
+    await page.click('#simpleShapeBtn');
+    await expect(page.locator('#simpleShapeSheet')).toBeVisible();
+    await expect(page.locator('.simple-shape-tile')).toHaveCount(Shapes.list.length);
+    await expect(page.locator('.simple-shape-tile[data-shape="square"]')).toHaveAttribute('aria-checked', 'true');
+    for (const tile of await page.locator('.simple-shape-tile').all()) {
+      const box = await tile.boundingBox();
+      expect(box.width, 'tiles are big enough for a small finger').toBeGreaterThanOrEqual(60);
+    }
+    await page.mouse.click(5, 5);
+    await expect(page.locator('#simpleShapeSheet')).toBeHidden();
+
+    // A second tap on a picture: the maze grows in that shape, even from 11 × 11.
+    await page.click('#simpleShapeBtn');
+    await page.click('.simple-shape-tile[data-shape="cat"]');
+    await expect(page.locator('#simpleShapeSheet')).toBeHidden();
+    await expect(page.locator('#phaseLabel')).toHaveText('Growing');
+    await waitForYourTurn(page);
+    const mask = Shapes.mask('cat', 15);
+    const { start } = Shapes.ends('cat', 15);
+    await expect(page.locator('#maze .cell')).toHaveCount(15 * 15);
+    await expect(page.locator('#maze .cell.off')).toHaveCount(mask.flat().filter(v => !v).length);
+    await expect(cell(page, start.r, start.c)).toHaveClass(/start/);
+    expect(shortestPath(await readMaze(page))).not.toBeNull();
+
+    // The button now wears the cat, and the choice is remembered.
+    await expect(page.locator('#simpleShapeIcon svg')).toHaveCount(1);
+    await page.reload();
+    await waitForYourTurn(page);
+    await expect(page.locator('#maze .cell.off')).toHaveCount(mask.flat().filter(v => !v).length);
+
+    // Picking while a maze is growing starts over in the new shape.
+    await page.click('#simpleGrowBtn');
+    await expect(page.locator('#phaseLabel')).toHaveText('Growing');
+    await page.click('#simpleShapeBtn');
+    await page.click('.simple-shape-tile[data-shape="square"]');
+    await waitForYourTurn(page);
+    await expect(page.locator('#maze .cell.off')).toHaveCount(0);
+    expect(shortestPath(await readMaze(page))).not.toBeNull();
+    expect(page.mazeErrors).toEqual([]);
   });
 });

@@ -1920,6 +1920,80 @@ html.info-open body { overflow: hidden; }
   box-shadow: 0 10px 24px rgba(52,199,89,0.28);
 }
 
+/* The shape button wears the current shape's picture. */
+.simple-action.shape {
+  background: linear-gradient(145deg, #ffb340, #ff9500);
+  box-shadow: 0 10px 24px rgba(255,149,0,0.28);
+}
+
+.simple-shape-icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+}
+
+.simple-shape-icon svg { width: 100%; height: 100%; fill: currentColor; }
+
+/* Big picture tiles over a dimmed maze; a tap outside closes them. */
+.simple-shape-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: end center;
+  padding: 16px max(16px, env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+
+.simple-shape-sheet[hidden] { display: none; }
+
+.simple-shape-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.28);
+}
+
+.simple-shape-picker {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  width: min(520px, 100%);
+  padding: 16px;
+  border-radius: 28px;
+  background: var(--surface-strong, #fff);
+  box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+  animation: shapeSheetIn 220ms cubic-bezier(.2,.8,.2,1) both;
+}
+
+@keyframes shapeSheetIn {
+  from { transform: translateY(24px); opacity: 0; }
+}
+
+.simple-shape-tile {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  min-height: 64px;
+  padding: 16%;
+  border: 0;
+  border-radius: 20px;
+  background: rgba(118,118,128,0.1);
+  color: var(--wall);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 120ms ease;
+}
+
+.simple-shape-tile svg { width: 100%; height: 100%; }
+.simple-shape-tile:active { transform: scale(0.94); }
+
+.simple-shape-tile[aria-checked="true"] {
+  background: rgba(255,149,0,0.16);
+  color: #c93400;
+  box-shadow: inset 0 0 0 3px #ff9500;
+}
+
 .simple-action:active { transform: scale(0.94); }
 .simple-action:disabled { opacity: 0.35; cursor: default; }
 
@@ -2020,12 +2094,15 @@ html.info-open body { overflow: hidden; }
   .simple-mode-button { width: 44px; padding: 0; justify-content: center; }
   .simple-mode-button span { display: none; }
   .simple-action { width: 76px; height: 76px; }
+  .simple-mode .simple-bar { gap: 20px; }
+  .simple-shape-icon { width: 40px; height: 40px; }
 }
 
 @media print {
   .simple-mode-button,
   .full-mode-button,
-  .simple-bar {
+  .simple-bar,
+  .simple-shape-sheet {
     display: none !important;
   }
 }
