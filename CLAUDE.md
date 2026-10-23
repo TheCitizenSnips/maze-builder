@@ -407,6 +407,12 @@ for smoother Pencil tracking.
 
 Do not require Pencil-specific proprietary APIs when standard Pointer Events are sufficient.
 
+## 12a. Zoom and pan
+
+The maze fits its window by default (`.maze-viewport`, sized from `--fit-cell`). A two-finger pinch on the grid, Ctrl + scroll or a trackpad pinch on a computer, or the zoom buttons under the maze (zoom out, zoom in, fit) make the squares bigger inside that same window (`--zoom` multiplies the square size, so walls stay crisp and `mazeGeometry` needs no zoom maths); two fingers then drag it around. One finger always draws, solves or edits, and Pencil and mouse never pinch.
+
+A second finger is kept from the maze. It only starts a pinch once it slides, so a resting palm does not interrupt a line. When both fingers land together before the first has moved, whatever the first finger just did (a wall, a moved S or F, the start of a line) is put back; a later pinch pauses the line as a lift would. A new grid size returns to fit, and printing always shows the whole maze. In Build and Solve mode the zoom bar is hidden and a white fit picture button appears at the end of the button row while zoomed.
+
 ---
 
 # MAZE GENERATION

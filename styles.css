@@ -605,12 +605,79 @@ select:disabled {
   border: 0.5px solid rgba(60,60,67,0.12);
 }
 
-.maze-stage {
-  /* Cells shrink to fit the card so even 25 × 25 never needs sideways
-     scrolling, which the drawing surface cannot do (touch-action: none). */
-  --cell-size: min(5vw, 36px);
-  --cell-size: max(10px, min(36px, (100cqw - 2 * var(--maze-border)) / var(--grid-size)));
+/* The window the maze sits in. Squares shrink to fit the card (--fit-cell)
+   so even 25 × 25 never needs sideways scrolling, and the window keeps that
+   fitted size. Zooming (--zoom, set by app.js) makes the squares bigger
+   inside it; the maze then scrolls within the window, never the page
+   sideways. Hidden scrollbars keep the window the same size either way. */
+.maze-viewport {
+  --zoom: 1;
+  --fit-cell: min(5vw, 36px);
+  --fit-cell: max(10px, min(36px, (100cqw - 2 * var(--maze-border)) / var(--grid-size)));
+  height: calc(var(--fit-cell) * var(--grid-size) + 2 * var(--maze-border));
+  overflow: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  /* One finger beside the maze still scrolls; on the maze it draws. */
+  touch-action: pan-x pan-y;
+  /* Breathing room when the app scrolls the maze into view. */
+  scroll-margin: calc(env(safe-area-inset-top) + 12px) 0 calc(env(safe-area-inset-bottom) + 12px);
 }
+
+.maze-viewport::-webkit-scrollbar { display: none; }
+
+/* Zoomed in, the window's rounded edge clips the maze like the maze's own
+   border does when it all fits. */
+.maze-viewport.zoomed {
+  overflow: auto;
+  border-radius: 9px;
+}
+
+.maze-stage {
+  --cell-size: calc(var(--fit-cell) * var(--zoom));
+}
+
+/* Under the maze: a hint and the zoom buttons, kept quiet and small. */
+.zoom-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.zoom-hint {
+  min-width: 0;
+  color: var(--secondary-label);
+  font-size: 13px;
+}
+
+.zoom-buttons {
+  display: flex;
+  flex: none;
+  padding: 2px;
+  border-radius: 12px;
+  background: rgba(118,118,128,0.12);
+}
+
+.zoom-button {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--blue);
+  cursor: pointer;
+  transition: background-color 150ms ease, opacity 150ms ease;
+}
+
+.zoom-button svg { width: 20px; height: 20px; fill: currentColor; }
+.zoom-button:active:not(:disabled) { background: rgba(255,255,255,0.9); }
+.zoom-button:disabled { color: var(--secondary-label); opacity: 0.45; cursor: default; }
 
 #maze {
   display: grid;
@@ -626,8 +693,6 @@ select:disabled {
   -webkit-user-select: none;
   background: #fff;
   isolation: isolate;
-  /* Breathing room when the app scrolls the maze into view. */
-  scroll-margin: calc(env(safe-area-inset-top) + 12px) 0 calc(env(safe-area-inset-bottom) + 12px);
 }
 
 .cell {
@@ -911,8 +976,8 @@ select:disabled {
 @media (min-width: 981px) {
   /* Side-by-side layout: also keep the whole maze inside the screen height
      so a Pencil solve on a landscape iPad never needs scrolling. */
-  .maze-stage {
-    --cell-size: max(16px, min(36px, (100cqw - 2 * var(--maze-border)) / var(--grid-size), (100dvh - 380px) / var(--grid-size)));
+  .maze-viewport {
+    --fit-cell: max(16px, min(36px, (100cqw - 2 * var(--maze-border)) / var(--grid-size), (100dvh - 430px) / var(--grid-size)));
   }
 }
 
@@ -1007,6 +1072,14 @@ select:disabled {
   }
 
   .wall-layer line.zap { animation: none !important; opacity: 0; }
+
+  /* Print the whole maze, however far it is zoomed on screen. */
+  .maze-viewport {
+    height: auto;
+    overflow: visible;
+  }
+
+  .zoom-bar { display: none !important; }
 
   .wall-layer {
     print-color-adjust: exact;
@@ -2034,9 +2107,24 @@ html.info-open body { overflow: hidden; }
 
 /* Bigger squares for small fingers, and the whole maze plus the buttons
    kept on one screen so there is nothing to scroll. */
-.simple-mode .maze-stage {
-  --cell-size: max(12px, min(56px, (100cqw - 2 * var(--maze-border)) / var(--grid-size), (100dvh - 290px) / var(--grid-size)));
+.simple-mode .maze-viewport {
+  --fit-cell: max(12px, min(56px, (100cqw - 2 * var(--maze-border)) / var(--grid-size), (100dvh - 290px) / var(--grid-size)));
 }
+
+.simple-mode .zoom-bar { display: none; }
+
+/* Back to the whole maze: only there while zoomed in. */
+.simple-action.fit {
+  align-self: center;
+  width: 60px;
+  height: 60px;
+  color: var(--blue);
+  background: #fff;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+}
+
+.simple-action.fit svg { width: 30px; height: 30px; }
+.simple-action[hidden] { display: none; }
 
 /* Where to put your finger: S glows until the line starts, then the end of
    a lifted line glows until it is picked up again. */
@@ -2094,7 +2182,9 @@ html.info-open body { overflow: hidden; }
   .simple-mode-button { width: 44px; padding: 0; justify-content: center; }
   .simple-mode-button span { display: none; }
   .simple-action { width: 76px; height: 76px; }
+  .simple-action.fit { width: 56px; height: 56px; }
   .simple-mode .simple-bar { gap: 20px; }
+  .simple-mode .simple-bar.zoomed { gap: 12px; }
   .simple-shape-icon { width: 40px; height: 40px; }
 }
 

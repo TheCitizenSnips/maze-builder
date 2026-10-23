@@ -59,6 +59,11 @@
   const userSolveBtn = byId('userSolveBtn');
   const userSolveBtnLabel = userSolveBtn && userSolveBtn.querySelector('span');
   const mazeStage = byId('mazeStage');
+  const mazeViewport = byId('mazeViewport');
+  const zoomInBtn = byId('zoomInBtn');
+  const zoomOutBtn = byId('zoomOutBtn');
+  const zoomFitBtn = byId('zoomFitBtn');
+  const zoomHint = byId('zoomHint');
   const userPathOverlay = byId('userPathOverlay');
   const userPathGlow = byId('userPathGlow');
   const userPathLine = byId('userPathLine');
@@ -83,6 +88,7 @@
   const simpleGrowBtn = byId('simpleGrowBtn');
   const simpleSolveBtn = byId('simpleSolveBtn');
   const simpleShapeBtn = byId('simpleShapeBtn');
+  const simpleFitBtn = byId('simpleFitBtn');
   const simpleShapeIcon = byId('simpleShapeIcon');
   const simpleShapeSheet = byId('simpleShapeSheet');
   const simpleShapePicker = byId('simpleShapePicker');
@@ -230,6 +236,14 @@
   let userLastPoint = null;
   let celebrationToken = 0;
   let drawPointerId = null;
+  // Puts back whatever the current one-finger stroke changed, for when a
+  // second finger lands right after it and the touch turns out to be a pinch.
+  let strokeUndo = null;
+  let strokeEdges = null;
+
+  // How far the maze is zoomed in: 1 fits the whole maze in its window.
+  let zoom = 1;
+  let zoomSize = null;
 
   // Each level is a size plus a setting for each Maze style dial (0 to 4).
   // Medium is the classic depth-first maze: no turn preference, no
@@ -329,11 +343,11 @@
   // the maze starts growing or being solved, scroll it into view; leave the
   // page alone when it is already fully visible.
   function bringMazeIntoView() {
-    const box = mazeEl.getBoundingClientRect();
+    const box = mazeViewport.getBoundingClientRect();
     const viewHeight = window.innerHeight || document.documentElement.clientHeight;
     if (box.top >= 0 && box.bottom <= viewHeight) return;
     const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    mazeEl.scrollIntoView({
+    mazeViewport.scrollIntoView({
       behavior: reduceMotion ? 'auto' : 'smooth',
       // Show the status line above the maze too when there is room.
       block: box.height <= viewHeight ? 'end' : 'start'
@@ -701,7 +715,12 @@
   }
 
   function render() {
-    mazeStage.style.setProperty('--grid-size', size);
+    mazeViewport.style.setProperty('--grid-size', size);
+    // A new grid size starts from the whole maze again.
+    if (size !== zoomSize) {
+      zoomSize = size;
+      resetZoom();
+    }
     mazeStage.classList.toggle('shaped', isShaped());
     mazeEl.innerHTML = '';
     renderWalls();
@@ -844,7 +863,10 @@
       }
     }
 
-    if (hasWall(edge) !== drawValue) setWall(edge, drawValue);
+    if (hasWall(edge) !== drawValue) {
+      if (strokeEdges) strokeEdges.push({ edge, was: !drawValue });
+      setWall(edge, drawValue);
+    }
     lastPainted = edgeKey(edge);
   }
 
@@ -878,7 +900,13 @@
       const p = pointCell(e.clientX, e.clientY, geo);
       if (!p) return;
       e.preventDefault();
+      const before = { start, end, mode };
       placeMarker(p);
+      strokeUndo = () => {
+        ({ start, end } = before);
+        render();
+        setMode(before.mode);
+      };
       return;
     }
 
@@ -895,6 +923,10 @@
     drawPointerId = e.pointerId;
     drawLastPoint = { x: e.clientX, y: e.clientY };
     try { mazeEl.setPointerCapture(e.pointerId); } catch (_) {}
+    const changed = strokeEdges = [];
+    strokeUndo = () => {
+      for (const step of changed.reverse()) setWall(step.edge, step.was);
+    };
     paintEdge(edge, true);
   });
 
@@ -932,11 +964,12 @@
   });
 
   function endDrawStroke(e) {
-    if (e.pointerId !== drawPointerId) return;
+    if (e && e.pointerId !== drawPointerId) return;
     drawing = false;
     drawPointerId = null;
     drawLastPoint = null;
     lastPainted = null;
+    strokeEdges = null;
   }
 
   window.addEventListener('pointerup', endDrawStroke);
@@ -1865,6 +1898,7 @@
     document.getElementById('clearSolutionBtn').disabled = false;
     userSolveBtn.disabled = false;
     bringMazeIntoView();
+    revealCell(start);
 
     setStatus('Touch S with Apple Pencil or your finger, then trace through the corridors to F.', 'Your Turn');
   }
@@ -2096,7 +2130,9 @@
 
     e.preventDefault();
 
+    const before = userAttemptSnapshot();
     resetUserAttempt();
+    strokeUndo = () => restoreUserAttempt(before);
     captureUserPointer(e);
     userTracing = true;
     userPath = [{ r: start.r, c: start.c }];
@@ -2141,6 +2177,8 @@
     if (!onLast && !near) return false;
 
     e.preventDefault();
+    const before = userAttemptSnapshot();
+    strokeUndo = () => restoreUserAttempt(before);
     captureUserPointer(e);
     userTracing = true;
     startUserTimer(userPausedElapsedMs);
@@ -2149,6 +2187,40 @@
 
     setStatus(`Tracing with ${toolLabel(e)}. Keep going to F.`, 'Tracing');
     return true;
+  }
+
+  // The attempt as it stood before a stroke, so a stroke that turns out to
+  // be the first finger of a pinch leaves no trace. A finished attempt is
+  // not kept: touching S after finishing starts afresh either way.
+  function userAttemptSnapshot() {
+    return userCompleted ? null : {
+      path: userPath.slice(),
+      moves: userMoves,
+      backtracks: userBacktracks,
+      pausedMs: userPausedElapsedMs
+    };
+  }
+
+  function restoreUserAttempt(before) {
+    if (!userSolveMode || userCompleted) return;
+    if (!before || !before.path.length) {
+      resetUserAttempt();
+      setStatus('Start your line on S, then keep the Pencil or finger down as you trace.', 'Your Turn');
+      return;
+    }
+    stopUserTimer();
+    userTracing = false;
+    userPointerId = null;
+    userLastPoint = null;
+    userPath = before.path;
+    userPathSet = new Set(userPath.map(p => cellId(p.r, p.c)));
+    userMoves = before.moves;
+    userBacktracks = before.backtracks;
+    userPausedElapsedMs = before.pausedMs;
+    markUserCoveredCells();
+    syncUserOverlay();
+    updateUserMetrics(userPausedElapsedMs);
+    setStatus('Paused. Touch the end of your blue line to keep going.', 'Paused');
   }
 
   function celebrationCopy(efficiency, elapsed) {
@@ -2365,6 +2437,226 @@
 
   window.addEventListener('resize', () => {
     if (userSolveMode) syncUserOverlay();
+  });
+
+  // ---------- Zoom and pan ----------
+  // The maze fits its window by default. A pinch on the grid, or the zoom
+  // buttons under it, make the squares bigger inside that same window, like
+  // a map on a page, and two fingers drag it around. Zooming sets the square
+  // size itself (--zoom) rather than scaling a picture, so walls stay crisp
+  // and every pointer calculation (mazeGeometry) keeps working unchanged.
+  const ZOOM_STEP = 1.5;
+  // Squares may grow to about this many pixels, and always to at least
+  // twice their fitted size.
+  const ZOOM_CELL_PX = 64;
+  // A second finger that slides this far (px) starts a pinch. One resting
+  // or drifting a little, like a palm or the other hand, leaves the line
+  // alone.
+  const PINCH_SLOP = 24;
+  // A second finger this soon (ms) after the first, before the first has
+  // gone anywhere (px), means both were meant for a pinch, so whatever the
+  // first one just drew or moved is put back.
+  const PINCH_TOGETHER_MS = 350;
+  const PINCH_TOGETHER_PX = 24;
+
+  function fitCellPx() {
+    return mazeEl.clientWidth / size / zoom;
+  }
+
+  function maxZoom() {
+    const fit = fitCellPx();
+    return fit > 0 ? Math.min(6, Math.max(2, ZOOM_CELL_PX / fit)) : 2;
+  }
+
+  // Zoom so the point of the maze at fraction (fx, fy) of its width and
+  // height lands under the screen point (x, y).
+  function applyZoom(next, fx, fy, x, y) {
+    next = Math.max(1, Math.min(maxZoom(), next));
+    if (next < 1.04) next = 1;
+    zoom = next;
+    mazeViewport.style.setProperty('--zoom', String(zoom));
+    mazeViewport.classList.toggle('zoomed', zoom > 1);
+    const box = mazeStage.getBoundingClientRect();
+    mazeViewport.scrollLeft += box.left + fx * box.width - x;
+    mazeViewport.scrollTop += box.top + fy * box.height - y;
+    syncZoomUI();
+  }
+
+  // Zoom keeping the maze point under (x, y) still; the window's centre by
+  // default, which is what the buttons use.
+  function zoomAround(next, x, y) {
+    const view = mazeViewport.getBoundingClientRect();
+    if (x === undefined) {
+      x = view.left + view.width / 2;
+      y = view.top + view.height / 2;
+    }
+    const box = mazeStage.getBoundingClientRect();
+    if (!box.width || !box.height) return;
+    applyZoom(next, (x - box.left) / box.width, (y - box.top) / box.height, x, y);
+  }
+
+  function resetZoom() {
+    zoom = 1;
+    mazeViewport.style.setProperty('--zoom', '1');
+    mazeViewport.classList.remove('zoomed');
+    mazeViewport.scrollLeft = 0;
+    mazeViewport.scrollTop = 0;
+    syncZoomUI();
+  }
+
+  function syncZoomUI() {
+    const zoomed = zoom > 1;
+    zoomOutBtn.disabled = !zoomed;
+    zoomFitBtn.disabled = !zoomed;
+    zoomInBtn.disabled = zoom >= maxZoom() - 0.01;
+    zoomHint.textContent = zoomed
+      ? 'Drag with two fingers to look around.'
+      : 'Pinch the maze to zoom in.';
+    simpleFitBtn.hidden = !zoomed;
+    simpleFitBtn.parentElement.classList.toggle('zoomed', zoomed);
+  }
+
+  // Scroll the zoomed maze just enough to show a square, such as S when
+  // solving starts.
+  function revealCell(p) {
+    if (zoom <= 1 || !p) return;
+    const el = getCellElement(p.r, p.c);
+    if (!el) return;
+    const view = mazeViewport.getBoundingClientRect();
+    const box = el.getBoundingClientRect();
+    const margin = box.width;
+    if (box.left < view.left) mazeViewport.scrollLeft -= view.left - box.left + margin;
+    else if (box.right > view.right) mazeViewport.scrollLeft += box.right - view.right + margin;
+    if (box.top < view.top) mazeViewport.scrollTop -= view.top - box.top + margin;
+    else if (box.bottom > view.bottom) mazeViewport.scrollTop += box.bottom - view.bottom + margin;
+  }
+
+  // Touches on the maze window, watched before the maze sees them. A lone
+  // finger goes through to drawing, solving or editing as always. Any other
+  // finger is kept from the maze; once one slides, the two fingers pinch and
+  // pan. Pencil and mouse never pinch.
+  const touches = new Map();
+  const gestureTouches = new Set();
+  let pinch = null;
+  let pinchFrame = 0;
+
+  function touchPair() {
+    return [...touches.values()].slice(0, 2);
+  }
+
+  // The lone finger's stroke ends here: put it back if the two fingers came
+  // down together, otherwise keep it, just as if the finger had lifted.
+  function interruptStroke(together) {
+    const undo = strokeUndo;
+    strokeUndo = null;
+    if (drawing) endDrawStroke();
+    if (together && undo) undo();
+    else if (userTracing) endUserTrace();
+  }
+
+  function beginPinch(together) {
+    const [a, b] = touchPair();
+    interruptStroke(together);
+    for (const id of touches.keys()) gestureTouches.add(id);
+    const box = mazeStage.getBoundingClientRect();
+    const mx = (a.x + b.x) / 2;
+    const my = (a.y + b.y) / 2;
+    pinch = {
+      dist: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)),
+      zoom,
+      fx: (mx - box.left) / box.width,
+      fy: (my - box.top) / box.height
+    };
+  }
+
+  function stepPinch() {
+    pinchFrame = 0;
+    if (!pinch || touches.size < 2) return;
+    const [a, b] = touchPair();
+    const dist = Math.max(1, Math.hypot(a.x - b.x, a.y - b.y));
+    applyZoom(pinch.zoom * dist / pinch.dist, pinch.fx, pinch.fy, (a.x + b.x) / 2, (a.y + b.y) / 2);
+  }
+
+  // A pinch carries on from wherever the remaining two fingers are now.
+  function restartPinch() {
+    pinch = null;
+    if (touches.size >= 2) {
+      beginPinch(false);
+    }
+  }
+
+  mazeViewport.addEventListener('pointerdown', e => {
+    if (e.pointerType !== 'touch') {
+      strokeUndo = null;
+      return;
+    }
+    const t = { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, at: performance.now() };
+    // The maze gets this finger unless another finger already has it.
+    const mazeHasFinger = [...touches.keys()].some(id => !gestureTouches.has(id));
+    touches.set(e.pointerId, t);
+    if (!mazeHasFinger && !pinch) {
+      strokeUndo = null;
+      return;
+    }
+    gestureTouches.add(e.pointerId);
+    e.stopPropagation();
+    e.preventDefault();
+    try { mazeViewport.setPointerCapture(e.pointerId); } catch (_) {}
+    if (pinch) restartPinch();
+  }, true);
+
+  mazeViewport.addEventListener('pointermove', e => {
+    const t = touches.get(e.pointerId);
+    if (!t) return;
+    t.x = e.clientX;
+    t.y = e.clientY;
+    if (!pinch && touches.size >= 2 && gestureTouches.has(e.pointerId) &&
+        Math.hypot(t.x - t.x0, t.y - t.y0) >= PINCH_SLOP) {
+      const [a, b] = touchPair();
+      const first = [...touches].find(([id]) => !gestureTouches.has(id));
+      const still = !first || Math.hypot(first[1].x - first[1].x0, first[1].y - first[1].y0) < PINCH_TOGETHER_PX;
+      beginPinch(still && Math.abs(b.at - a.at) <= PINCH_TOGETHER_MS);
+    }
+    if (!gestureTouches.has(e.pointerId)) return;
+    e.stopPropagation();
+    e.preventDefault();
+    if (pinch && !pinchFrame) pinchFrame = requestAnimationFrame(stepPinch);
+  }, true);
+
+  function endTouch(e) {
+    if (!touches.has(e.pointerId)) return;
+    touches.delete(e.pointerId);
+    if (gestureTouches.delete(e.pointerId)) e.stopPropagation();
+    if (pinch && touches.size < 2) {
+      pinch = null;
+      syncZoomUI();
+    } else if (pinch) {
+      restartPinch();
+    }
+  }
+
+  mazeViewport.addEventListener('pointerup', endTouch, true);
+  mazeViewport.addEventListener('pointercancel', endTouch, true);
+  // Safari's own pinch gesture would zoom the whole page.
+  mazeViewport.addEventListener('gesturestart', e => e.preventDefault());
+
+  // A trackpad pinch (or Ctrl + scroll) on a computer zooms the maze too.
+  mazeViewport.addEventListener('wheel', e => {
+    if (!e.ctrlKey) return;
+    e.preventDefault();
+    zoomAround(zoom * Math.exp(-e.deltaY / 100), e.clientX, e.clientY);
+  }, { passive: false });
+
+  zoomInBtn.addEventListener('click', () => zoomAround(zoom * ZOOM_STEP));
+  zoomOutBtn.addEventListener('click', () => zoomAround(zoom / ZOOM_STEP));
+  zoomFitBtn.addEventListener('click', resetZoom);
+  simpleFitBtn.addEventListener('click', resetZoom);
+
+  // The fitted square size changes with rotation, so the most a maze may
+  // zoom does too.
+  window.addEventListener('resize', () => {
+    if (zoom > maxZoom()) zoomAround(maxZoom());
+    syncZoomUI();
   });
 
   sizeSelect.addEventListener('change', () => {
