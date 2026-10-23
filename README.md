@@ -80,7 +80,7 @@ A picture-only way to play for children who cannot read yet. Tap the
 smiley **Build & Solve** button at the top to turn it on. The words,
 settings and numbers step aside, a maze grows on its own, and then S glows
 to show where to start drawing. Three big picture buttons sit under the maze:
-the sparkle grows a new maze, the pencil wipes the line to draw again, and
+the sparkle grows a new maze, the round arrow wipes the line to draw again, and
 the orange button (wearing the current shape) opens big picture tiles of the
 shapes. Tapping one, a cat or a rocket say, grows a new maze in that shape
 straight away (on an 11 × 11 grid it grows to 15 × 15 first).

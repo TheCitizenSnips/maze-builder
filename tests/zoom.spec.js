@@ -290,11 +290,14 @@ test.describe('Pinch and two-finger pan', () => {
 
     // All the buttons still fit across the screen.
     const width = page.viewportSize().width;
-    for (const id of ['#simpleGrowBtn', '#simpleSolveBtn', '#simpleFitBtn', '#simpleShapeBtn']) {
+    for (const id of ['#simpleGrowBtn', '#simpleSolveBtn', '#simpleShapeBtn', '#simpleFitBtn']) {
       const box = await page.locator(id).boundingBox();
       expect(box.x).toBeGreaterThanOrEqual(0);
       expect(box.x + box.width).toBeLessThanOrEqual(width);
     }
+    // The fit button comes last, after the shape button.
+    const shapeBox = await page.locator('#simpleShapeBtn').boundingBox();
+    expect((await page.locator('#simpleFitBtn').boundingBox()).x).toBeGreaterThan(shapeBox.x);
 
     await page.click('#simpleFitBtn');
     await expect(page.locator('#simpleFitBtn')).toBeHidden();
