@@ -21,6 +21,10 @@ function serveStamped(page, { pageBuild, scriptBuild }) {
 }
 
 test.describe('Release stamp', () => {
+  // The badge shows the release time in local time; pin the zone so the
+  // date it shows does not depend on where the tests run.
+  test.use({ timezoneId: 'UTC' });
+
   test.beforeEach(async ({}, testInfo) => {
     test.skip(testInfo.project.name === 'ipad', 'Desktop and iPhone widths cover the badge');
   });
@@ -45,7 +49,7 @@ test.describe('Release stamp', () => {
     await expect(page.locator('#maze .cell').first()).toBeVisible();
 
     const label = page.locator('#offlineBadge .release-label');
-    await expect(label).toContainText(/Oct 2[01]/);
+    await expect(label).toContainText('Oct 20');
     await expect(page.locator('#offlineBadge')).toHaveAttribute('title', /^Version a1b2c3d, released /);
     // A phone shows the date only, so the badge stays on one line.
     const commit = page.locator('#offlineBadge .release-commit');

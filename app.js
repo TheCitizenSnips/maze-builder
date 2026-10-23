@@ -82,6 +82,17 @@
   const confettiField = byId('confettiField');
   const successReplayBtn = byId('successReplayBtn');
   const successNewMazeBtn = byId('successNewMazeBtn');
+  const successNewMazeChoice = byId('successNewMazeChoice');
+  const successReplayChoice = byId('successReplayChoice');
+  const simpleStars = byId('simpleStars');
+  const simpleResultTitle = byId('simpleResultTitle');
+  const simpleYouBar = byId('simpleYouBar');
+  const simpleBestBar = byId('simpleBestBar');
+  const simpleYouSquares = byId('simpleYouSquares');
+  const simpleBestSquares = byId('simpleBestSquares');
+  const simpleTime = byId('simpleTime');
+  const simpleBacktracks = byId('simpleBacktracks');
+  const simpleTip = byId('simpleTip');
 
   const simpleModeBtn = byId('simpleModeBtn');
   const fullModeBtn = byId('fullModeBtn');
@@ -2252,6 +2263,52 @@
     };
   }
 
+  // Build and Solve result: the stars and the two bars carry the meaning for
+  // a child who cannot read; the words and numbers are for an older sibling
+  // giving pointers. Stars follow the same tiers as celebrationCopy.
+  function starCount(efficiency) {
+    if (efficiency >= 100) return 3;
+    if (efficiency >= 75) return 2;
+    return 1;
+  }
+
+  function simpleResultCopy(efficiency, extra) {
+    const squares = extra === 1 ? 'square' : 'squares';
+    if (efficiency >= 100) {
+      return { title: 'Perfect!', tip: 'That was the shortest way. Ready for a new maze?' };
+    }
+    if (efficiency >= 90) {
+      return { title: 'So close!', tip: `Just ${extra} extra ${squares}. Try again for 3 stars!` };
+    }
+    if (efficiency >= 75) {
+      return { title: 'Great job!', tip: `${extra} extra ${squares}. Look for the shortest way and try again!` };
+    }
+    return { title: 'You did it!', tip: `${extra} extra ${squares}. Look ahead before you draw, then try again!` };
+  }
+
+  function fillSimpleResult(efficiency, elapsed) {
+    const stars = starCount(efficiency);
+    const best = userOptimalCells || userMoves;
+    const extra = Math.max(0, userMoves - best);
+    const copy = simpleResultCopy(efficiency, extra);
+
+    [...simpleStars.children].forEach((star, i) => star.classList.toggle('on', i < stars));
+    simpleStars.setAttribute('aria-label', `${stars} of 3 stars`);
+    simpleResultTitle.textContent = copy.title;
+    simpleTip.textContent = copy.tip;
+    simpleYouSquares.textContent = String(userMoves);
+    simpleBestSquares.textContent = String(best);
+    simpleYouBar.style.setProperty('--fill', '100%');
+    simpleBestBar.style.setProperty('--fill', `${Math.round((best / Math.max(userMoves, 1)) * 100)}%`);
+    simpleTime.textContent = `${elapsed.toFixed(1)}s`;
+    simpleBacktracks.textContent = String(userBacktracks);
+
+    // Point at what to do next: a perfect route earns a new maze, anything
+    // else is worth another go on the same one.
+    successNewMazeChoice.classList.toggle('suggested', stars === 3);
+    successReplayChoice.classList.toggle('suggested', stars < 3);
+  }
+
   function createConfetti() {
     confettiField.innerHTML = '';
     const colors = ['#007aff', '#30d158', '#ffd60a', '#ff375f', '#5856d6', '#64d2ff'];
@@ -2316,6 +2373,7 @@
     successCells.textContent = String(userMoves);
     successBest.textContent = String(userOptimalCells);
     successEfficiency.textContent = `${efficiency}%`;
+    fillSimpleResult(efficiency, elapsed);
 
     createConfetti();
 

@@ -2147,8 +2147,11 @@ html.info-open body { overflow: hidden; }
   50% { transform: scale(1.6); }
 }
 
-/* The celebration speaks in pictures: trophy, confetti and two buttons
-   (draw this maze again, or grow a new one). */
+/* The celebration leads with pictures a child can read: stars, a blue bar
+   for their line beside a gold bar for the shortest one, and two big
+   buttons with the suggested next one glowing. Short words and numbers sit
+   underneath for an older sibling giving pointers. */
+.simple-mode .success-icon,
 .simple-mode .success-kicker,
 .simple-mode .success-title,
 .simple-mode .success-subtitle,
@@ -2159,9 +2162,140 @@ html.info-open body { overflow: hidden; }
   display: none;
 }
 
-.simple-mode .success-card { width: min(360px, 100%); padding: 32px 22px 28px; }
-.simple-mode .success-icon { width: 104px; height: 104px; border-radius: 32px; margin-bottom: 24px; }
-.simple-mode .success-icon svg { width: 54px; height: 54px; }
+.simple-result { display: none; }
+
+.simple-mode .simple-result { display: block; }
+
+.simple-mode .success-card { width: min(380px, 100%); padding: 26px 22px 24px; }
+
+.simple-stars {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.simple-stars svg {
+  width: 56px;
+  height: 56px;
+  fill: rgba(118,118,128,0.18);
+}
+
+/* The middle star stands a little taller, like a podium. */
+.simple-stars svg:nth-child(2) { width: 72px; height: 72px; }
+
+.simple-stars svg.on {
+  fill: var(--gold);
+  filter: drop-shadow(0 4px 10px rgba(255,190,0,0.35));
+  animation: starPop 520ms cubic-bezier(.2,.8,.2,1.2) both;
+}
+
+.simple-stars svg.on:nth-child(2) { animation-delay: 180ms; }
+.simple-stars svg.on:nth-child(3) { animation-delay: 360ms; }
+
+@keyframes starPop {
+  0% { transform: scale(.3) rotate(-20deg); opacity: 0; }
+  60% { transform: scale(1.18) rotate(6deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0); }
+}
+
+.simple-result-title {
+  margin-top: 8px;
+  font-size: 30px;
+  font-weight: 780;
+  letter-spacing: -0.035em;
+}
+
+.simple-compare {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0 12px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(118,118,128,0.08);
+}
+
+.simple-compare-row {
+  display: grid;
+  grid-template-columns: 32px 1fr 74px;
+  align-items: center;
+  gap: 10px;
+}
+
+.simple-compare-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: #fff;
+}
+
+.simple-compare-icon svg { width: 18px; height: 18px; fill: currentColor; }
+
+.simple-compare-track {
+  height: 14px;
+  border-radius: 7px;
+  background: rgba(118,118,128,0.12);
+  overflow: hidden;
+}
+
+.simple-compare-track i {
+  display: block;
+  width: var(--fill, 0%);
+  height: 100%;
+  border-radius: inherit;
+  animation: barGrow 700ms cubic-bezier(.2,.8,.2,1) 200ms both;
+}
+
+@keyframes barGrow {
+  from { width: 0; }
+}
+
+.simple-compare-row.you .simple-compare-icon,
+.simple-compare-row.you .simple-compare-track i { background: var(--blue); }
+.simple-compare-row.best .simple-compare-icon { background: #e0b400; }
+.simple-compare-row.best .simple-compare-track i { background: var(--gold); }
+
+.simple-compare-value {
+  text-align: left;
+  line-height: 1.1;
+}
+
+.simple-compare-value b {
+  display: block;
+  font-size: 20px;
+  font-weight: 760;
+  font-variant-numeric: tabular-nums;
+}
+
+.simple-compare-value small {
+  color: var(--secondary-label);
+  font-size: 11px;
+}
+
+.simple-result-facts {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  color: var(--secondary-label);
+  font-size: 15px;
+}
+
+.simple-result-facts span { display: inline-flex; align-items: center; gap: 5px; }
+.simple-result-facts svg { width: 17px; height: 17px; fill: currentColor; }
+
+.simple-result-facts b {
+  color: var(--label, #000);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.simple-result-tip {
+  margin: 12px 0 20px;
+  font-size: 15px;
+  line-height: 1.35;
+}
 
 .simple-mode .success-picture-actions {
   display: flex;
@@ -2169,12 +2303,48 @@ html.info-open body { overflow: hidden; }
   gap: 28px;
 }
 
+.success-choice {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+}
+
+.success-choice > span {
+  color: var(--secondary-label);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* The next thing to do glows; the other button stays there to choose. */
+.success-choice.suggested > span { color: var(--label, #000); font-weight: 750; }
+
+.success-choice.suggested .simple-action {
+  animation: suggestPulse 1.6s ease-in-out 900ms infinite;
+}
+
+.success-choice.suggested .simple-action.grow { --ring: rgba(88,86,214,0.45); }
+.success-choice.suggested .simple-action.solve { --ring: rgba(52,199,89,0.5); }
+
+@keyframes suggestPulse {
+  0%, 100% { outline: 0 solid var(--ring); outline-offset: 0; }
+  50% { outline: 7px solid transparent; outline-offset: 6px; }
+}
+
+.success-choice:not(.suggested) .simple-action { opacity: 0.85; }
+
 @media (prefers-reduced-motion: reduce) {
   /* Still show where to touch, as a steady glow instead of a pulse. */
   .simple-mode .maze-stage.await-start .cell.start {
     box-shadow: inset 0 0 0 3px var(--green), 0 0 0 5px rgba(48,209,88,0.35);
   }
   .full-mode-button.holding .hold-ring { --hold: 360deg; }
+  .simple-stars svg.on,
+  .simple-compare-track i { animation: none; }
+  .success-choice.suggested .simple-action {
+    animation: none;
+    outline: 4px solid var(--ring);
+    outline-offset: 4px;
+  }
 }
 
 @media (max-width: 720px) {
