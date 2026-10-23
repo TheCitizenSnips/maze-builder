@@ -35,6 +35,8 @@
     <symbol id="i-route" viewBox="0 0 24 24"><path d="M6 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6zm12 12a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM7 8h5a4 4 0 0 1 4 4v3h-2v-3a2 2 0 0 0-2-2H7V8z"/></symbol>
     <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.8 9.95l-3.75-3.75L3 17.25zm17.7-10.04a1 1 0 0 0 0-1.41L18.2 3.3a1 1 0 0 0-1.41 0l-1.96 1.96 3.75 3.75 2.12-1.8z"/></symbol>
     <symbol id="i-info" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 1.8a8.2 8.2 0 1 1 0 16.4 8.2 8.2 0 0 1 0-16.4zM12 7a1.3 1.3 0 1 0 0 2.6A1.3 1.3 0 0 0 12 7zm-1.1 4v6.2h2.2V11h-2.2z"/></symbol>
+    <symbol id="i-kid" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 1.8a8.2 8.2 0 1 1 0 16.4 8.2 8.2 0 0 1 0-16.4zM8.6 8.4a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm6.8 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM7.3 13.6a5 5 0 0 0 9.4 0h-2a3.1 3.1 0 0 1-5.4 0h-2z"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 6h9v2H4zm13 0h3v2h-3zm-4-2h2v6h-2zM4 16h3v2H4zm7 0h9v2h-9zm-4-2h2v6H7z"/></symbol>
     <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M18 2H6v3H3v4c0 2.2 1.8 4 4 4h.2A5 5 0 0 0 11 16.9V19H7v2h10v-2h-4v-2.1A5 5 0 0 0 16.8 13H17c2.2 0 4-1.8 4-4V5h-3V2zM5 9V7h1v3.7A2 2 0 0 1 5 9zm14 0a2 2 0 0 1-1 1.7V7h1v2z"/></symbol>
   </svg>
 
@@ -48,9 +50,23 @@
         </div>
       </div>
 
-      <div id="offlineBadge" class="status-chip" aria-live="polite">
-        <svg><use href="#i-offline"></use></svg>
-        <span>Web</span>
+      <div class="nav-actions">
+        <button id="simpleModeBtn" class="simple-mode-button" aria-label="Build and Solve: a picture-only mode for little kids">
+          <svg><use href="#i-kid"></use></svg>
+          <span>Build &amp; Solve</span>
+        </button>
+
+        <!-- Build and Solve mode only: a press and hold, so a grown-up can find
+             the way back but a quick tap from a small child does nothing. -->
+        <button id="fullModeBtn" class="full-mode-button" aria-label="Back to full mode (press and hold)">
+          <span class="hold-ring" aria-hidden="true"><svg><use href="#i-sliders"></use></svg></span>
+          <span class="hold-caption">Hold for full mode</span>
+        </button>
+
+        <div id="offlineBadge" class="status-chip" aria-live="polite">
+          <svg><use href="#i-offline"></use></svg>
+          <span>Web</span>
+        </div>
       </div>
     </header>
 
@@ -262,6 +278,12 @@
           </div>
         </div>
 
+        <!-- Build and Solve mode: picture buttons instead of the controls above. -->
+        <div class="simple-bar" role="group" aria-label="Play">
+          <button id="simpleGrowBtn" class="simple-action grow" aria-label="Grow a new maze"><svg><use href="#i-spark"></use></svg></button>
+          <button id="simpleSolveBtn" class="simple-action solve" aria-label="Draw your way through"><svg><use href="#i-pencil"></use></svg></button>
+        </div>
+
         <div id="successSheet" class="success-sheet" hidden>
           <div class="success-backdrop"></div>
           <div class="success-card" role="dialog" aria-modal="true" aria-labelledby="successTitle">
@@ -280,6 +302,11 @@
             <button class="success-learn" data-info="solve" data-info-section="info-solve-score"><svg><use href="#i-info"></use></svg>How is my score worked out?</button>
 
             <button id="successAgainBtn" class="ios-button primary">Try Again</button>
+
+            <div class="success-picture-actions" role="group" aria-label="Play again">
+              <button id="successNewMazeBtn" class="simple-action grow" aria-label="Grow a new maze"><svg><use href="#i-spark"></use></svg></button>
+              <button id="successReplayBtn" class="simple-action solve" aria-label="Draw this maze again"><svg><use href="#i-pencil"></use></svg></button>
+            </div>
             <button id="successCloseBtn" class="success-close">Done</button>
 
             <div id="confettiField" class="confetti-field" aria-hidden="true"></div>
