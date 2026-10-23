@@ -41,6 +41,8 @@
     <symbol id="i-zoom-out" viewBox="0 0 24 24"><path d="M5 11h14v2H5z"/></symbol>
     <symbol id="i-zoom-fit" viewBox="0 0 24 24"><path d="M4 4h6v2H7.4l3.3 3.3-1.4 1.4L6 7.4V10H4V4zm10 0h6v6h-2V7.4l-3.3 3.3-1.4-1.4L16.6 6H14V4zM9.3 13.3l1.4 1.4L7.4 18H10v2H4v-6h2v2.6l3.3-3.3zm5.4 0 3.3 3.3V14h2v6h-6v-2h2.6l-3.3-3.3 1.4-1.4z"/></symbol>
     <symbol id="i-again" viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8z"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 2.5l2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 17.1l-5.9 3.2 1.3-6.5-4.9-4.5 6.6-.8z"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 2a8 8 0 1 1 0 16 8 8 0 0 1 0-16zm-1 3v6l5 3 1-1.7-4-2.4V7h-2z"/></symbol>
     <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M18 2H6v3H3v4c0 2.2 1.8 4 4 4h.2A5 5 0 0 0 11 16.9V19H7v2h10v-2h-4v-2.1A5 5 0 0 0 16.8 13H17c2.2 0 4-1.8 4-4V5h-3V2zM5 9V7h1v3.7A2 2 0 0 1 5 9zm14 0a2 2 0 0 1-1 1.7V7h1v2z"/></symbol>
   </svg>
 
@@ -329,9 +331,41 @@
 
             <button id="successAgainBtn" class="ios-button primary">Try Again</button>
 
+            <!-- Build and Solve result: stars a child can count, then short
+                 words and numbers for an older sibling helping out. -->
+            <div class="simple-result">
+              <div id="simpleStars" class="simple-stars" role="img" aria-label="3 of 3 stars">
+                <svg><use href="#i-star"></use></svg><svg><use href="#i-star"></use></svg><svg><use href="#i-star"></use></svg>
+              </div>
+              <div id="simpleResultTitle" class="simple-result-title">Perfect!</div>
+              <div class="simple-compare">
+                <div class="simple-compare-row you">
+                  <span class="simple-compare-icon"><svg><use href="#i-pencil"></use></svg></span>
+                  <span class="simple-compare-track"><i id="simpleYouBar"></i></span>
+                  <span class="simple-compare-value"><b id="simpleYouSquares">0</b><small>your line</small></span>
+                </div>
+                <div class="simple-compare-row best">
+                  <span class="simple-compare-icon"><svg><use href="#i-route"></use></svg></span>
+                  <span class="simple-compare-track"><i id="simpleBestBar"></i></span>
+                  <span class="simple-compare-value"><b id="simpleBestSquares">0</b><small>shortest</small></span>
+                </div>
+              </div>
+              <div class="simple-result-facts">
+                <span><svg><use href="#i-clock"></use></svg><b id="simpleTime">0.0s</b></span>
+                <span><svg><use href="#i-again"></use></svg><b id="simpleBacktracks">0</b>back-ups</span>
+              </div>
+              <p id="simpleTip" class="simple-result-tip">Shortest way! Ready for a new maze?</p>
+            </div>
+
             <div class="success-picture-actions" role="group" aria-label="Play again">
-              <button id="successNewMazeBtn" class="simple-action grow" aria-label="Grow a new maze"><svg><use href="#i-spark"></use></svg></button>
-              <button id="successReplayBtn" class="simple-action solve" aria-label="Draw this maze again"><svg><use href="#i-again"></use></svg></button>
+              <div id="successNewMazeChoice" class="success-choice">
+                <button id="successNewMazeBtn" class="simple-action grow" aria-label="Grow a new maze"><svg><use href="#i-spark"></use></svg></button>
+                <span>New maze</span>
+              </div>
+              <div id="successReplayChoice" class="success-choice">
+                <button id="successReplayBtn" class="simple-action solve" aria-label="Draw this maze again"><svg><use href="#i-again"></use></svg></button>
+                <span>Try again</span>
+              </div>
             </div>
             <button id="successCloseBtn" class="success-close">Done</button>
 

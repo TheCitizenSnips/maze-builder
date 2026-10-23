@@ -60,6 +60,29 @@ test.describe('Build and Solve mode', () => {
     expect(page.mazeErrors).toEqual([]);
   });
 
+  test('a wobbly route earns fewer stars and suggests trying again', async ({ page }, testInfo) => {
+    await openApp(page, { size: 11, speed: 'Super fast' });
+    await enterSimpleMode(page);
+    await waitForYourTurn(page);
+
+    const pointer = await makePointer(page, defaultPointerType(testInfo));
+    const route = shortestPath(await readMaze(page));
+
+    // Step forward, back up, then carry on: two extra squares and one back-up.
+    const wobble = [...route.slice(0, 3), route[1], ...route.slice(2)];
+    await traceCells(page, wobble, { pointer });
+
+    await expect(page.locator('#successSheet')).toBeVisible();
+    await expect(page.locator('#simpleYouSquares')).toHaveText(String(route.length + 2));
+    await expect(page.locator('#simpleBestSquares')).toHaveText(String(route.length));
+    await expect(page.locator('#simpleBacktracks')).toHaveText('1');
+    await expect(page.locator('#simpleTip')).toContainText('2 extra squares');
+    expect(await page.locator('#simpleStars svg.on').count()).toBeLessThan(3);
+    await expect(page.locator('#successReplayChoice')).toHaveClass(/suggested/);
+    await expect(page.locator('#successNewMazeChoice')).not.toHaveClass(/suggested/);
+    expect(page.mazeErrors).toEqual([]);
+  });
+
   test('the setting is remembered and the next visit starts growing a maze', async ({ page }) => {
     await openApp(page, { size: 11, speed: 'Super fast' });
     await enterSimpleMode(page);
@@ -73,7 +96,7 @@ test.describe('Build and Solve mode', () => {
     expect(page.mazeErrors).toEqual([]);
   });
 
-  test('a child can solve it and the celebration is all pictures', async ({ page }, testInfo) => {
+  test('a child can solve it and the celebration leads with pictures', async ({ page }, testInfo) => {
     await openApp(page, { size: 11, speed: 'Super fast' });
     await enterSimpleMode(page);
     await waitForYourTurn(page);
@@ -93,6 +116,14 @@ test.describe('Build and Solve mode', () => {
     for (const hidden of ['#successTitle', '.success-metrics', '#successAgainBtn', '#successCloseBtn']) {
       await expect(page.locator(hidden), `${hidden} is hidden`).toBeHidden();
     }
+    // Three stars, both bars the same length, and a new maze suggested.
+    await expect(page.locator('#simpleStars svg.on')).toHaveCount(3);
+    await expect(page.locator('#simpleResultTitle')).toHaveText('Perfect!');
+    await expect(page.locator('#simpleYouSquares')).toHaveText(String(route.length));
+    await expect(page.locator('#simpleBestSquares')).toHaveText(String(route.length));
+    await expect(page.locator('#simpleTime')).toHaveText(/^\d+\.\ds$/);
+    await expect(page.locator('#successNewMazeChoice')).toHaveClass(/suggested/);
+    await expect(page.locator('#successReplayChoice')).not.toHaveClass(/suggested/);
     await expect(page.locator('#successReplayBtn')).toBeVisible();
     await expect(page.locator('#successNewMazeBtn')).toBeVisible();
 
