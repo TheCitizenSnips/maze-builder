@@ -125,10 +125,8 @@
         add(rect(84, 46, 16, 30, 4)),
         add(rect(22, 76, 20, 24)),
         add(rect(58, 76, 20, 24)),
-        cut(rect(30, 14, 15, 15), { min: 15 }),
-        cut(rect(55, 14, 15, 15), { min: 15 }),
-        cut(rect(37, 19, 8, 8), { max: 11 }),
-        cut(rect(55, 19, 8, 8), { max: 11 }),
+        cut(rect(30, 14, 15, 15)),
+        cut(rect(55, 14, 15, 15)),
         cut(rect(32, 54, 36, 10), { min: 21 })
       ]
     },
@@ -232,6 +230,11 @@
   ];
 
   const byId = new Map(SHAPES.map(shape => [shape.id, shape]));
+
+  // The smallest grid a picture is offered on. Below it a cat or a castle
+  // is too few squares to read as one. The masks themselves work at any
+  // size from here up, so bigger grids need no extra drawings.
+  const MIN_SIZE = 15;
 
   function partsFor(shape, n) {
     return shape.parts.filter(part => (!part.min || n >= part.min) && (!part.max || n <= part.max));
@@ -373,36 +376,11 @@
     return null;
   }
 
-  // The mask for a shape at an n × n grid: mask[r][c] is true for squares in
-  // the maze. Always one piece: a stray bit the picture only touches at a
-  // corner or across a thin gap is joined on with a short bridge, and a
-  // speck too far away is left out.
-  const cache = new Map();
-  function shapeMask(id, n) {
-    const cacheKey = `${id}:${n}`;
-    if (cache.has(cacheKey)) return cache.get(cacheKey);
-    const shape = byId.get(id) || byId.get('square');
-    const parts = partsFor(shape, n);
-    const box = extent(parts.filter(part => !part.cut));
-    // A point or a sloping roof can leave the first or last row or column
-    // just under half covered, which wastes a whole line of the grid. Trim
-    // that edge of the picture a little at a time until the shape reaches it.
-    let cover;
-    let on;
-    for (let tries = 0; ; tries++) {
-      cover = coverage(parts, box, n);
-      on = cover.map(row => row.map(v => v >= COVER));
-      const trim = { top: !on[0].some(Boolean), bottom: !on[n - 1].some(Boolean),
-        left: !on.some(row => row[0]), right: !on.some(row => row[n - 1]) };
-      if (tries === 8 || !(trim.top || trim.bottom || trim.left || trim.right)) break;
-      const dx = box.w / n / 4;
-      const dy = box.h / n / 4;
-      if (trim.left) { box.x0 += dx; box.w -= dx; }
-      if (trim.right) box.w -= dx;
-      if (trim.top) { box.y0 += dy; box.h -= dy; }
-      if (trim.bottom) box.h -= dy;
-    }
-
+  // Squares at least half covered, made into one piece: a stray bit the
+  // picture only touches at a corner or across a thin gap is joined on with
+  // a short bridge, and a speck too far away is left out.
+  function joinPieces(cover, n) {
+    const on = cover.map(row => row.map(v => v >= COVER));
     const maxBridge = Math.max(1, Math.round(n / 10));
     let groups = pieces(on, n);
     while (groups.length > 1) {
@@ -416,6 +394,35 @@
         for (const [r, c] of other) on[r][c] = false;
       }
       groups = pieces(on, n);
+    }
+    return on;
+  }
+
+  // The mask for a shape at an n × n grid: mask[r][c] is true for squares in
+  // the maze. Always one piece, and it reaches all four sides of the grid.
+  const cache = new Map();
+  function shapeMask(id, n) {
+    const cacheKey = `${id}:${n}`;
+    if (cache.has(cacheKey)) return cache.get(cacheKey);
+    const shape = byId.get(id) || byId.get('square');
+    const parts = partsFor(shape, n);
+    const box = extent(parts);
+    // A point or a sloping roof can leave the first or last row or column
+    // just under half covered (or only joined on by a speck that gets left
+    // out), which wastes a whole line of the grid. Trim that edge of the
+    // picture a little at a time until the finished mask reaches it.
+    let on;
+    for (let tries = 0; ; tries++) {
+      on = joinPieces(coverage(parts, box, n), n);
+      const trim = { top: !on[0].some(Boolean), bottom: !on[n - 1].some(Boolean),
+        left: !on.some(row => row[0]), right: !on.some(row => row[n - 1]) };
+      if (tries >= 4 + n / 4 || !(trim.top || trim.bottom || trim.left || trim.right)) break;
+      const dx = box.w / n / 4;
+      const dy = box.h / n / 4;
+      if (trim.left) { box.x0 += dx; box.w -= dx; }
+      if (trim.right) box.w -= dx;
+      if (trim.top) { box.y0 += dy; box.h -= dy; }
+      if (trim.bottom) box.h -= dy;
     }
 
     cache.set(cacheKey, on);
@@ -478,7 +485,7 @@
       return `<polygon points="${part.points.map(p => p.map(v => +v.toFixed(2)).join(',')).join(' ')}" fill="${fill}"/>`;
     };
     // Framed like the mask: the picture stretched to a square.
-    const box = extent(parts.filter(part => !part.cut));
+    const box = extent(parts);
     const maskId = `shape-mask-${id}`;
     return `<svg viewBox="${box.x0} ${box.y0} ${box.w} ${box.h}" preserveAspectRatio="none" aria-hidden="true" focusable="false">` +
       `<mask id="${maskId}" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100">${parts.map(draw).join('')}</mask>` +
@@ -487,6 +494,7 @@
 
   const api = {
     list: SHAPES.map(({ id, label }) => ({ id, label })),
+    minSize: MIN_SIZE,
     has: id => byId.has(id),
     label: id => (byId.get(id) || byId.get('square')).label,
     mask: shapeMask,

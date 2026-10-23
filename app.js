@@ -428,17 +428,22 @@
     if (nextSize === size) return;
     size = nextSize;
     sizeSelect.value = String(size);
+    const squared = fitShapeToSize();
     makeBlankGrid();
+    if (squared) announceSquared();
   }
 
   function applyLevel(name) {
     if (running) return;
     const level = LEVELS[name];
     for (const dialName of Object.keys(dials)) dials[dialName].value = String(level[dialName]);
+    const shapeBefore = shapeId;
     setSize(level.size);
     syncLevelUI();
     saveSettings();
-    setStatus(`${level.label} is set. Tap Grow a Maze to build one.`, 'Ready');
+    setStatus(shapeBefore !== shapeId
+      ? `${level.label} is set. Its maze is too small for a shape, so it is a square again.`
+      : `${level.label} is set. Tap Grow a Maze to build one.`, 'Ready');
   }
 
   // Shape picker: one picture tile per shape, so a child who cannot read
@@ -467,12 +472,36 @@
     shapeLabel.textContent = Shapes.label(shapeId);
   }
 
+  // A picture needs at least Shapes.minSize squares across, so picking one
+  // on a smaller grid makes the grid that big first.
   function applyShape(id) {
     if (running || id === shapeId) return;
     shapeId = id;
+    const grew = id !== 'square' && size < Shapes.minSize;
+    if (grew) {
+      size = Shapes.minSize;
+      sizeSelect.value = String(size);
+      syncLevelUI();
+    }
     saveSettings();
     syncShapeUI();
     makeBlankGrid();
+    if (grew) {
+      setStatus(`Shapes need room, so the grid grew to ${size} × ${size}. Grow a maze to fill the ${Shapes.label(id).toLowerCase()}.`, 'Ready');
+    }
+  }
+
+  // Going below the smallest shape size turns the maze back into a square.
+  // Returns true when it did.
+  function fitShapeToSize() {
+    if (shapeId === 'square' || size >= Shapes.minSize) return false;
+    shapeId = 'square';
+    syncShapeUI();
+    return true;
+  }
+
+  function announceSquared() {
+    setStatus(`Shapes need ${Shapes.minSize} × ${Shapes.minSize} or bigger, so this maze is a square again.`, 'Ready');
   }
 
   function makeBlankGrid() {
@@ -2291,9 +2320,11 @@
 
   sizeSelect.addEventListener('change', () => {
     size = Number(sizeSelect.value);
+    const squared = fitShapeToSize();
     saveSettings();
     makeBlankGrid();
     syncLevelUI();
+    if (squared) announceSquared();
   });
 
   speedSelect.addEventListener('change', saveSettings);
@@ -2569,6 +2600,8 @@
   useAlgorithmMetricLabels();
   showRelease();
   buildShapePicker();
+  // Saved settings from before shapes had a smallest size.
+  fitShapeToSize();
   syncShapeUI();
   syncLevelUI();
   makeBlankGrid();

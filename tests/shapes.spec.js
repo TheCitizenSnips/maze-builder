@@ -5,7 +5,9 @@ const {
   cell, makePointer, defaultPointerType, traceCells, metric, toggleWall
 } = require('./helpers');
 
-const SIZES = [11, 15, 21, 25];
+// Every size the app offers a shape on, plus bigger ones so a larger board
+// later needs no new drawings.
+const SIZES = [15, 21, 25, 31, 41, 51];
 const DIRS = [[1, 0], [0, 1], [-1, 0], [0, -1]];
 
 /** Squares reachable from `from` without leaving the mask. */
@@ -101,7 +103,7 @@ test.describe('Shaped mazes', () => {
     expect(page.mazeErrors).toEqual([]);
   });
 
-  for (const [id, size] of [['dinosaur', 11], ['castle', 15], ['butterfly', 25]]) {
+  for (const [id, size] of [['dinosaur', 15], ['castle', 21], ['butterfly', 25]]) {
     test(`a ${id} maze grows to fill exactly the shape (${size} × ${size})`, async ({ page }) => {
       await openApp(page, { size, speed: 'Super fast' });
       await pickShape(page, id);
@@ -128,9 +130,9 @@ test.describe('Shaped mazes', () => {
   }
 
   test('the outline cannot be drawn on, and Start stays inside the shape', async ({ page }) => {
-    await openApp(page, { size: 11 });
+    await openApp(page, { size: 15 });
     await pickShape(page, 'heart');
-    const mask = Shapes.mask('heart', 11);
+    const mask = Shapes.mask('heart', 15);
 
     // An inside edge still toggles.
     const before = await readMaze(page);
@@ -154,7 +156,7 @@ test.describe('Shaped mazes', () => {
   });
 
   test('a child can solve a shaped maze along the best route for 100%', async ({ page }, testInfo) => {
-    await openApp(page, { size: 11, speed: 'Super fast' });
+    await openApp(page, { size: 15, speed: 'Super fast' });
     await pickShape(page, 'rocket');
     const maze = await growMaze(page);
     const route = shortestPath(maze);
@@ -173,9 +175,9 @@ test.describe('Shaped mazes', () => {
       navigator.canShare = data => Boolean(data && data.files && data.files.length);
       navigator.share = async data => { window.shared = data; };
     });
-    await openApp(page, { size: 11 });
+    await openApp(page, { size: 15 });
     await pickShape(page, 'heart');
-    const mask = Shapes.mask('heart', 11);
+    const mask = Shapes.mask('heart', 15);
     const r = mask.findIndex(row => row.some(Boolean));
     const c = mask[r].findIndex(Boolean);
     expect(mask[0][0]).toBe(false);
@@ -204,6 +206,36 @@ test.describe('Shaped mazes', () => {
     expect(colours.outline).toBe('28,43,79');
     expect(colours.oldBorder).toBe('255,255,255');
     expect(colours.outside).toBe('255,255,255');
+    expect(page.mazeErrors).toEqual([]);
+  });
+
+  test('shapes start at 15 × 15: smaller grids are square', async ({ page }) => {
+    expect(Shapes.minSize).toBe(15);
+    await openApp(page, { size: 11 });
+
+    // Picking a shape on 11 × 11 grows the grid to 15 × 15.
+    await pickShape(page, 'star');
+    await expect(page.locator('#sizeSelect')).toHaveValue('15');
+    await expect(page.locator('#maze .cell')).toHaveCount(15 * 15);
+    await expect(page.locator('#maze .cell.off')).toHaveCount(15 * 15 - insideCount(Shapes.mask('star', 15)));
+    await expect(page.locator('#status')).toContainText('15 × 15');
+
+    // Going back down to 11 × 11, by size or by Easy, makes it a square again.
+    await setSize(page, 11);
+    await expect(page.locator('#shapeLabel')).toHaveText('Square');
+    await expect(page.locator('#maze .cell.off')).toHaveCount(0);
+    await expect(page.locator('#status')).toContainText('square');
+
+    await pickShape(page, 'cat');
+    await page.click('.level-picker [data-level="easy"]');
+    await expect(page.locator('#sizeSelect')).toHaveValue('11');
+    await expect(page.locator('#shapeLabel')).toHaveText('Square');
+
+    // An old saved shape on a small grid also comes back square.
+    await page.evaluate(() => localStorage.setItem('mazeBuilder.settings', JSON.stringify({ size: '11', shape: 'cat' })));
+    await page.reload();
+    await expect(page.locator('#shapeLabel')).toHaveText('Square');
+    await expect(page.locator('#maze .cell.off')).toHaveCount(0);
     expect(page.mazeErrors).toEqual([]);
   });
 
