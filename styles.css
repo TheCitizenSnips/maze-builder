@@ -295,6 +295,62 @@ button { -webkit-tap-highlight-color: transparent; }
 
 .style-details[open] .chevron { transform: rotate(90deg); }
 
+/* Shape picker: picture tiles, so choosing works before a child can read. */
+.shape-icon {
+  display: inline-grid;
+  width: 22px;
+  height: 22px;
+  color: var(--wall);
+}
+
+.shape-icon svg,
+.shape-tile svg {
+  width: 100%;
+  height: 100%;
+}
+
+.shape-picker {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding: 2px 0 8px;
+}
+
+.shape-tile {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  min-height: 48px;
+  padding: 18%;
+  border: 0;
+  border-radius: 14px;
+  background: rgba(118,118,128,0.1);
+  color: var(--wall);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 140ms ease, box-shadow 140ms ease, transform 120ms ease;
+}
+
+.shape-tile:active { transform: scale(0.96); }
+
+.shape-tile[aria-checked="true"] {
+  background: rgba(0,122,255,0.12);
+  color: var(--blue);
+  box-shadow: inset 0 0 0 2px var(--blue);
+}
+
+.shape-tile:disabled {
+  opacity: 0.42;
+  cursor: default;
+  transform: none;
+}
+
+.shape-tile:focus-visible {
+  outline: 3px solid rgba(0,122,255,0.45);
+  outline-offset: 2px;
+}
+
 .style-dials {
   display: grid;
   gap: 10px;
@@ -585,6 +641,29 @@ select:disabled {
     box-shadow 140ms ease,
     transform 140ms cubic-bezier(.2,.8,.2,1),
     opacity 140ms ease;
+}
+
+/* A shaped maze: squares outside the shape drop away, and the shape's
+   outline takes the place of the square border as the outside wall. */
+.maze-stage.shaped #maze {
+  background: transparent;
+  border-color: transparent;
+}
+
+.cell.off {
+  background: transparent;
+  border-color: transparent;
+}
+
+.wall-layer line.fixed { display: none; }
+
+.wall-layer .shape-outline {
+  fill: none;
+  stroke: var(--wall);
+  stroke-width: var(--maze-border);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
 }
 
 /* Inner walls are thin lines on the edges between squares, drawn above the

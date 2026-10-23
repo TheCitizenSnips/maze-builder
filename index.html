@@ -91,6 +91,16 @@
             </select>
           </label>
 
+          <details id="shapeDetails" class="style-details shape-details">
+            <summary class="row-control">
+              <span>Shape</span>
+              <span class="style-summary"><span id="shapeIcon" class="shape-icon" aria-hidden="true"></span><span id="shapeLabel">Square</span><svg class="chevron" viewBox="0 0 12 12" aria-hidden="true"><path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            </summary>
+
+            <div id="shapePicker" class="shape-picker" role="radiogroup" aria-label="Maze shape"></div>
+            <p class="dial-note shape-note">Shapes need a 15 × 15 grid or bigger. Picking one on a smaller grid makes it 15 × 15.</p>
+          </details>
+
           <details id="styleDetails" class="style-details">
             <summary class="row-control">
               <span>Maze style</span>
@@ -357,6 +367,9 @@
         </dl>
         <p>Easy is small with shortcuts. Medium is the classic maze. Hard is big and very twisty.</p>
 
+        <h3>Shapes</h3>
+        <p>Pick a picture under <strong>Shape</strong>, like a cat or a rocket, and the maze grows inside it. The outline of the picture is the outside wall, so the spark only digs inside the shape. S and F start far apart, and you can still move them anywhere inside. Shapes need a grid of 15 × 15 or bigger, so there are enough squares to draw the picture.</p>
+
         <button class="info-next" data-info="search">
           <span><small>Next</small>How the search finds the way</span>
           <span class="chevron" aria-hidden="true">›</span>
@@ -500,6 +513,7 @@
       });
     });
   </script>
+  <script src="./shapes.js" defer></script>
   <script src="./app.js" defer></script>
 </body>
 </html>
