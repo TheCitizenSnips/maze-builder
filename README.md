@@ -56,6 +56,23 @@ When the route reaches the finish:
 
 A 100% result means the player matched the mathematically shortest route.
 
+## Build & Solve mode (for little kids)
+
+A picture-only way to play for children who cannot read yet. Tap the
+smiley **Build & Solve** button at the top to turn it on. The words,
+settings and numbers step aside, a maze grows on its own, and then S glows
+to show where to start drawing. Two big picture buttons sit under the maze:
+the sparkle grows a new maze and the pencil wipes the line to draw again.
+Finishing shows a trophy, confetti and the same two buttons.
+
+The maze uses the size, level and speed last chosen in full mode, so a
+grown-up can pick Easy and Medium speed first.
+
+To go back to full mode, **press and hold** the button in the top corner
+until its ring fills (about a second and a half). A quick tap does nothing,
+so a small child is unlikely to leave by accident. The choice is remembered
+on the device, like the other settings.
+
 ## Learn how it works
 
 Small ⓘ buttons open reading sheets written for children under 12:

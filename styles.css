@@ -1707,3 +1707,246 @@ html.info-open body { overflow: hidden; }
     display: none !important;
   }
 }
+
+
+/* ---------- Build and Solve mode ---------- */
+
+/* A picture-only way to play for children who cannot read yet. The html
+   element carries .simple-mode; everything with words or settings steps
+   aside so the maze fills the screen, with two big picture buttons below. */
+
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.simple-mode-button {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 0 16px 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--indigo);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 650;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(88,86,214,0.22);
+}
+
+.simple-mode-button svg {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
+}
+
+.simple-mode-button:active { transform: scale(0.97); }
+
+.full-mode-button,
+.simple-bar,
+.success-picture-actions {
+  display: none;
+}
+
+.full-mode-button {
+  appearance: none;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--secondary-label);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* The ring fills while the button is held; letting go early empties it. */
+.hold-ring {
+  --hold: 0deg;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: conic-gradient(var(--blue) var(--hold), rgba(118,118,128,0.14) 0);
+}
+
+.hold-ring::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--bg);
+}
+
+.hold-ring svg {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+@property --hold {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.full-mode-button.holding .hold-ring {
+  animation: holdFill 1500ms linear both;
+}
+
+@keyframes holdFill {
+  to { --hold: 360deg; }
+}
+
+.simple-action {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+  border: 0;
+  border-radius: 50%;
+  color: #fff;
+  cursor: pointer;
+  transition: transform 140ms cubic-bezier(.2,.8,.2,1), opacity 140ms ease;
+}
+
+.simple-action svg {
+  width: 40px;
+  height: 40px;
+  fill: currentColor;
+}
+
+.simple-action.grow {
+  background: linear-gradient(145deg, #7c5cff, var(--indigo));
+  box-shadow: 0 10px 24px rgba(88,86,214,0.28);
+}
+
+.simple-action.solve {
+  background: #34c759;
+  box-shadow: 0 10px 24px rgba(52,199,89,0.28);
+}
+
+.simple-action:active { transform: scale(0.94); }
+.simple-action:disabled { opacity: 0.35; cursor: default; }
+
+.simple-mode .simple-mode-button,
+.simple-mode .brand-group > div,
+.simple-mode #offlineBadge,
+.simple-mode .sidebar,
+.simple-mode .content-header,
+.simple-mode .telemetry,
+.simple-mode .legend {
+  display: none;
+}
+
+.simple-mode .full-mode-button { display: inline-flex; }
+
+.simple-mode .nav-bar { margin-bottom: 10px; }
+.simple-mode .brand-icon { width: 44px; height: 44px; border-radius: 11px; }
+
+.simple-mode .workspace { display: block; }
+
+/* Just the maze card on the page: no panel around it. Without the panel's
+   blur, the celebration also covers the whole screen rather than the panel. */
+.simple-mode .content-panel {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.simple-mode .simple-bar {
+  display: flex;
+  justify-content: center;
+  gap: 28px;
+  margin-top: 16px;
+}
+
+/* Bigger squares for small fingers, and the whole maze plus the buttons
+   kept on one screen so there is nothing to scroll. */
+.simple-mode .maze-stage {
+  --cell-size: max(12px, min(56px, (100cqw - 2 * var(--maze-border)) / var(--grid-size), (100dvh - 290px) / var(--grid-size)));
+}
+
+/* Where to put your finger: S glows until the line starts, then the end of
+   a lifted line glows until it is picked up again. */
+.simple-mode .maze-stage.await-start .cell.start {
+  animation: startBeckon 1.4s ease-in-out infinite;
+}
+
+@keyframes startBeckon {
+  0%, 100% { box-shadow: inset 0 0 0 3px var(--green), 0 0 0 0 rgba(48,209,88,0.5); }
+  50% { box-shadow: inset 0 0 0 3px var(--green), 0 0 0 8px rgba(48,209,88,0); }
+}
+
+.simple-mode .maze-stage.await-resume .user-path-head {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: resumeBeckon 1.2s ease-in-out infinite;
+}
+
+@keyframes resumeBeckon {
+  50% { transform: scale(1.6); }
+}
+
+/* The celebration speaks in pictures: trophy, confetti and two buttons
+   (draw this maze again, or grow a new one). */
+.simple-mode .success-kicker,
+.simple-mode .success-title,
+.simple-mode .success-subtitle,
+.simple-mode .success-metrics,
+.simple-mode .success-learn,
+.simple-mode #successAgainBtn,
+.simple-mode .success-close {
+  display: none;
+}
+
+.simple-mode .success-card { width: min(360px, 100%); padding: 32px 22px 28px; }
+.simple-mode .success-icon { width: 104px; height: 104px; border-radius: 32px; margin-bottom: 24px; }
+.simple-mode .success-icon svg { width: 54px; height: 54px; }
+
+.simple-mode .success-picture-actions {
+  display: flex;
+  justify-content: center;
+  gap: 28px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Still show where to touch, as a steady glow instead of a pulse. */
+  .simple-mode .maze-stage.await-start .cell.start {
+    box-shadow: inset 0 0 0 3px var(--green), 0 0 0 5px rgba(48,209,88,0.35);
+  }
+  .full-mode-button.holding .hold-ring { --hold: 360deg; }
+}
+
+@media (max-width: 720px) {
+  /* Phone: the button keeps its picture and drops the words. */
+  .simple-mode-button { width: 44px; padding: 0; justify-content: center; }
+  .simple-mode-button span { display: none; }
+  .simple-action { width: 76px; height: 76px; }
+}
+
+@media print {
+  .simple-mode-button,
+  .full-mode-button,
+  .simple-bar {
+    display: none !important;
+  }
+}

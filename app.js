@@ -69,6 +69,13 @@
   const successAgainBtn = byId('successAgainBtn');
   const successCloseBtn = byId('successCloseBtn');
   const confettiField = byId('confettiField');
+  const successReplayBtn = byId('successReplayBtn');
+  const successNewMazeBtn = byId('successNewMazeBtn');
+
+  const simpleModeBtn = byId('simpleModeBtn');
+  const fullModeBtn = byId('fullModeBtn');
+  const simpleGrowBtn = byId('simpleGrowBtn');
+  const simpleSolveBtn = byId('simpleSolveBtn');
 
   const buttons = {
     draw: byId('drawBtn'),
@@ -126,6 +133,9 @@
   // guarded.
   const SETTINGS_KEY = 'mazeBuilder.settings';
   const rememberedControls = { size: sizeSelect, speed: speedSelect, ...dials };
+  // Build and Solve mode: the picture-only way to play for children who
+  // cannot read yet. Off unless a grown-up turned it on.
+  let simpleMode = false;
 
   // A saved value only comes back if the control can still show it: a
   // listed option for a menu, a whole step within range for a dial.
@@ -143,6 +153,7 @@
       return;
     }
     if (!saved || typeof saved !== 'object') return;
+    simpleMode = saved.simple === true;
 
     for (const [key, control] of Object.entries(rememberedControls)) {
       const value = String(saved[key]);
@@ -153,6 +164,7 @@
   function saveSettings() {
     const settings = {};
     for (const [key, control] of Object.entries(rememberedControls)) settings[key] = control.value;
+    settings.simple = simpleMode;
     try {
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
     } catch (error) {
@@ -326,6 +338,10 @@
     document.getElementById('blankBtn').disabled = disabled;
     document.getElementById('clearSolutionBtn').disabled = disabled;
     userSolveBtn.disabled = disabled;
+    // Build and Solve keeps its picture buttons while the child draws; only
+    // an animation turns them off.
+    simpleGrowBtn.disabled = disabled && running;
+    simpleSolveBtn.disabled = disabled && running;
   }
 
   function createCellState() {
@@ -1183,6 +1199,9 @@
       shortest: '—'
     });
     setStatus('Maze complete. Now discover how the search wave finds the finish.', 'Built');
+
+    // Little kids go straight from watching the maze grow to drawing in it.
+    if (simpleMode) enterUserSolveMode();
   }
 
   function computeBFSLayers() {
@@ -1518,6 +1537,16 @@
     } else {
       userPathHead.setAttribute('r', 0);
     }
+    syncSolveHints();
+  }
+
+  // Picture cues for children who cannot read the status line: S pulses
+  // until the line starts, and the end of a paused line pulses until it is
+  // picked up again. The styles only show them in Build and Solve mode.
+  function syncSolveHints() {
+    const waiting = userSolveMode && !userCompleted && !userTracing;
+    mazeStage.classList.toggle('await-start', waiting && !userPath.length);
+    mazeStage.classList.toggle('await-resume', waiting && userPath.length > 0);
   }
 
   function clearUserCellClasses() {
@@ -1886,6 +1915,7 @@
     userPausedElapsedMs = performance.now() - userStartedAt;
     updateUserMetrics(userPausedElapsedMs);
 
+    syncSolveHints();
     setStatus('Paused. Touch the end of your blue line to keep going.', 'Paused');
   }
 
@@ -1910,6 +1940,7 @@
     userTracing = true;
     startUserTimer(userPausedElapsedMs);
     traceUserPointTo(e.clientX, e.clientY);
+    syncSolveHints();
 
     setStatus(`Tracing with ${toolLabel(e)}. Keep going to F.`, 'Tracing');
     return true;
@@ -1969,6 +2000,7 @@
     userPointerId = null;
     userLastPoint = null;
     stopUserTimer();
+    syncSolveHints();
     const token = ++celebrationToken;
 
     const elapsed = userStartedAt ? (performance.now() - userStartedAt) / 1000 : 0;
@@ -2052,6 +2084,14 @@
     resetUserAttempt();
     setStatus('Try again. Start on S and see if you can improve your route.', 'Your Turn');
   });
+
+  successReplayBtn.addEventListener('click', () => {
+    successSheet.hidden = true;
+    resetUserAttempt();
+    setStatus('Try again. Start on S and see if you can improve your route.', 'Your Turn');
+  });
+
+  successNewMazeBtn.addEventListener('click', animateMazeGrowth);
 
   successCloseBtn.addEventListener('click', () => {
     successSheet.hidden = true;
@@ -2174,6 +2214,67 @@
   });
 
   document.getElementById('clearSolutionBtn').addEventListener('click', clearSolution);
+
+  // Build and Solve mode. One tap turns it on, since a grown-up reading the
+  // screen does that. The way back is a press and hold on the small button
+  // in the corner, so a quick tap from a child never leaves the mode.
+  const FULL_MODE_HOLD_MS = 1500;
+  let fullModeHoldTimer = null;
+
+  function syncSimpleModeUI() {
+    document.documentElement.classList.toggle('simple-mode', simpleMode);
+    simpleModeBtn.setAttribute('aria-pressed', String(simpleMode));
+  }
+
+  function enterSimpleMode() {
+    simpleMode = true;
+    syncSimpleModeUI();
+    saveSettings();
+    window.scrollTo(0, 0);
+    // Start with a maze growing, the part little kids love to watch.
+    if (!running) animateMazeGrowth();
+  }
+
+  function exitSimpleMode() {
+    simpleMode = false;
+    syncSimpleModeUI();
+    saveSettings();
+    if (!running) setStatus(userSolveMode ? 'Full mode is back. Keep drawing, or tap Stop Solving.' : 'Full mode is back.', userSolveMode ? null : 'Ready');
+  }
+
+  function cancelFullModeHold() {
+    clearTimeout(fullModeHoldTimer);
+    fullModeHoldTimer = null;
+    fullModeBtn.classList.remove('holding');
+  }
+
+  simpleModeBtn.addEventListener('click', enterSimpleMode);
+
+  fullModeBtn.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    cancelFullModeHold();
+    fullModeBtn.classList.add('holding');
+    fullModeHoldTimer = setTimeout(() => {
+      cancelFullModeHold();
+      exitSimpleMode();
+    }, FULL_MODE_HOLD_MS);
+  });
+  for (const type of ['pointerup', 'pointerleave', 'pointercancel']) {
+    fullModeBtn.addEventListener(type, cancelFullModeHold);
+  }
+  // A long press on iOS would otherwise open the callout menu.
+  fullModeBtn.addEventListener('contextmenu', e => e.preventDefault());
+  // Keyboard and switch users press the button without a pointer (detail 0).
+  fullModeBtn.addEventListener('click', e => {
+    if (e.detail === 0) exitSimpleMode();
+  });
+
+  simpleGrowBtn.addEventListener('click', animateMazeGrowth);
+  simpleSolveBtn.addEventListener('click', () => {
+    if (running) return;
+    if (userSolveMode) resetUserAttempt();
+    else enterUserSolveMode();
+  });
   document.getElementById('blankBtn').addEventListener('click', makeBlankGrid);
   document.getElementById('printBtn').addEventListener('click', printMaze);
 
@@ -2338,6 +2439,8 @@
   showRelease();
   syncLevelUI();
   makeBlankGrid();
+  syncSimpleModeUI();
+  if (simpleMode) animateMazeGrowth();
   window.addEventListener('load', registerServiceWorker);
   // Tells the check in index.html that this script started properly.
   window.mazeBuilderStarted = true;
