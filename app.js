@@ -31,6 +31,7 @@
   const shapePicker = byId('shapePicker');
   const shapeIcon = byId('shapeIcon');
   const shapeLabel = byId('shapeLabel');
+  const shapeNote = byId('shapeNote');
   // The shape pictures and masks come from shapes.js, loaded just before.
   const Shapes = window.MazeShapes;
   const dials = {
@@ -470,6 +471,8 @@
     }
     shapeIcon.innerHTML = Shapes.svg(shapeId).replace(/shape-mask-/g, 'shape-icon-mask-');
     shapeLabel.textContent = Shapes.label(shapeId);
+    // Only a grid too small for pictures explains the size rule.
+    shapeNote.hidden = size >= Shapes.minSize;
   }
 
   // A picture needs at least Shapes.minSize squares across, so picking one
@@ -513,6 +516,7 @@
       Array.from({ length: size }, () => createCellState())
     );
     useShapeMask();
+    syncShapeUI();
     walls = makeWalls(false);
 
     ({ start, end } = Shapes.ends(shapeId, size));
