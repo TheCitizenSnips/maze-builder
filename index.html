@@ -84,8 +84,11 @@
     </header>
 
     <section class="workspace">
+      <!-- Wide screens: one column beside the maze. Narrower screens lay the
+           cards out around the maze instead (see "Stacked layouts" in
+           styles.css), so a tall card never stretches the ones beside it. -->
       <aside class="sidebar">
-        <section class="group-card">
+        <section class="group-card card-maze">
           <div class="section-label section-label-info"><span>Maze</span><button class="info-button" data-info="grow" aria-label="How a maze grows"><svg><use href="#i-info"></use></svg></button></div>
 
           <div class="segmented level-picker" role="group" aria-label="Level">
@@ -147,17 +150,7 @@
           </details>
         </section>
 
-        <section class="group-card">
-          <div class="section-label">Editing</div>
-          <div class="segmented" role="group" aria-label="Editing mode">
-            <button id="drawBtn" class="segment active"><svg><use href="#i-draw"></use></svg><span>Walls</span></button>
-            <button id="startBtn" class="segment"><svg><use href="#i-start"></use></svg><span>Start</span></button>
-            <button id="endBtn" class="segment"><svg><use href="#i-end"></use></svg><span>Finish</span></button>
-          </div>
-        </section>
-
-
-        <section class="group-card">
+        <section class="group-card card-animate">
           <div class="section-label section-label-info"><span>Animate</span><button class="info-button" data-info="search" aria-label="How the search finds the way"><svg><use href="#i-info"></use></svg></button></div>
 
           <button id="generateBtn" class="ios-button primary">
@@ -186,7 +179,7 @@
           </label>
         </section>
 
-        <section class="group-card">
+        <section class="group-card card-utilities">
           <div class="section-label">Utilities</div>
 
           <button id="instantBtn" class="list-action">
@@ -232,7 +225,7 @@
         </section>
       </aside>
 
-      <section class="content-panel">
+      <section id="contentPanel" class="content-panel">
         <div class="content-header">
           <div class="content-heading">
             <div id="phaseLabel" class="phase-label">Ready</div>
@@ -298,7 +291,13 @@
           </div>
           </div>
 
-          <div class="zoom-bar">
+          <!-- Under the maze: what a finger on the maze does, then zoom. -->
+          <div class="maze-tools">
+            <div class="segmented edit-tools" role="group" aria-label="Editing mode">
+              <button id="drawBtn" class="segment active"><svg><use href="#i-draw"></use></svg><span>Walls</span></button>
+              <button id="startBtn" class="segment"><svg><use href="#i-start"></use></svg><span>Start</span></button>
+              <button id="endBtn" class="segment"><svg><use href="#i-end"></use></svg><span>Finish</span></button>
+            </div>
             <span id="zoomHint" class="zoom-hint">Pinch the maze to zoom in.</span>
             <div class="zoom-buttons" role="group" aria-label="Zoom">
               <button id="zoomOutBtn" class="zoom-button" aria-label="Zoom out" disabled><svg><use href="#i-zoom-out"></use></svg></button>

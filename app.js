@@ -2520,6 +2520,18 @@
     if (userSolveMode) syncUserOverlay();
   });
 
+  // Beside the controls, the maze panel stays on screen while they scroll
+  // (styles.css), but only while all of it fits: a big grid can make the
+  // panel taller than the screen, and then it scrolls with the page so the
+  // bottom of the maze and the tools under it stay reachable.
+  const contentPanel = byId('contentPanel');
+  function syncPanelFit() {
+    contentPanel.classList.toggle('fits-screen', contentPanel.offsetHeight + 32 <= window.innerHeight);
+  }
+  if ('ResizeObserver' in window) new ResizeObserver(syncPanelFit).observe(contentPanel);
+  window.addEventListener('resize', syncPanelFit);
+  syncPanelFit();
+
   // ---------- Zoom and pan ----------
   // The maze fits its window by default. A pinch on the grid, or the zoom
   // buttons under it, make the squares bigger inside that same window, like

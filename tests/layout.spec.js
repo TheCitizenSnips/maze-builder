@@ -89,6 +89,55 @@ test.describe('Layout', () => {
     })).toBe(true);
   });
 
+  test('opening a card never stretches the cards beside it', async ({ page }) => {
+    await openApp(page);
+    const heights = () => page.evaluate(() =>
+      ['.card-maze', '.card-animate', '.card-utilities'].map(sel => {
+        const card = document.querySelector(sel);
+        const last = card.lastElementChild.getBoundingClientRect();
+        return Math.round(card.getBoundingClientRect().bottom - last.bottom);
+      }));
+    const closed = await heights();
+    await page.click('#shapeDetails summary');
+    await page.click('#styleDetails summary');
+    // The space under each card's last control stays its own padding.
+    expect(await heights()).toEqual(closed);
+    for (const gap of closed) expect(gap).toBeLessThan(40);
+  });
+
+  test('the editing tools sit under the maze, beside zoom', async ({ page }) => {
+    await openApp(page);
+    const [maze, tools] = await page.evaluate(() =>
+      ['#maze', '.edit-tools'].map(sel => document.querySelector(sel).getBoundingClientRect().toJSON()));
+    expect(tools.top).toBeGreaterThan(maze.bottom);
+    expect(tools.top - maze.bottom).toBeLessThan(60);
+  });
+
+  test('stacked layouts put Grow a Maze first and the explainer after the maze', async ({ page }, testInfo) => {
+    test.skip(page.viewportSize().width > 980, 'Side by side, the maze starts at the top');
+    await openApp(page);
+    const order = await page.evaluate(() =>
+      ['.card-animate', '#maze', '.card-utilities', '.info-card']
+        .map(sel => document.querySelector(sel).getBoundingClientRect().top + window.scrollY));
+    // Grow a Maze, then the maze, then the occasional tools and the explainer.
+    expect(order[0]).toBeLessThan(order[1]);
+    expect(order[1]).toBeLessThan(order[3]);
+    if (testInfo.project.name === 'iphone') expect(order[1]).toBeLessThan(order[2]);
+  });
+
+  test('side by side, the maze panel stays on screen only while all of it fits', async ({ page }, testInfo) => {
+    test.skip(page.viewportSize().width <= 980, 'Only the wide layout places the maze beside the controls');
+    await openApp(page);
+    const sticky = () => page.locator('#contentPanel').evaluate(el => getComputedStyle(el).position === 'sticky');
+    await setSize(page, 15);
+    await expect.poll(sticky).toBe(true);
+    // A 51 × 51 maze makes the panel taller than the screen; then it scrolls
+    // with the page so the bottom row and the tools under it stay reachable.
+    await page.setViewportSize({ width: 1280, height: 700 });
+    await setSize(page, 51);
+    await expect.poll(sticky).toBe(false);
+  });
+
   test('controls are comfortable touch targets', async ({ page }) => {
     await openApp(page);
     const small = await page.evaluate(() =>
