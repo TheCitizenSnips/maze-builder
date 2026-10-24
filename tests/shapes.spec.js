@@ -42,9 +42,9 @@ test.describe('Shape masks', () => {
   // Pure checks on shapes.js; once is enough.
   test.beforeEach(({}, testInfo) => test.skip(testInfo.project.name !== 'desktop'));
 
-  test('there are 15 pictures plus the plain square', () => {
+  test('there are 19 pictures plus the plain square', () => {
     expect(Shapes.list[0].id).toBe('square');
-    expect(Shapes.list).toHaveLength(16);
+    expect(Shapes.list).toHaveLength(20);
   });
 
   for (const { id } of Shapes.list) {
