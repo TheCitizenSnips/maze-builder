@@ -25,7 +25,7 @@ async function holdFullModeButton(page, ms) {
   await page.mouse.up();
 }
 
-test.describe('Build and Solve mode', () => {
+test.describe('Kid Mode (Build and Solve)', () => {
   test('full mode is the default, with one tap into Build and Solve', async ({ page }) => {
     await openApp(page, { size: 11, speed: 'Super fast' });
     await expect(page.locator('html')).not.toHaveClass(/simple-mode/);
@@ -33,11 +33,12 @@ test.describe('Build and Solve mode', () => {
     await expect(page.locator('#fullModeBtn')).toBeHidden();
     await expect(page.locator('.simple-bar')).toBeHidden();
     await expect(page.locator('#simpleShapeBtn')).toBeHidden();
+    await expect(page.locator('#simpleModeBtn')).toHaveText('Kid Mode');
 
     await enterSimpleMode(page);
 
     // Words, settings and numbers step aside; the maze and two picture buttons stay.
-    for (const hidden of ['.sidebar', '.telemetry', '.legend', '#status', '#userSolveBtn', '#simpleModeBtn', '.info-button']) {
+    for (const hidden of ['.sidebar', '.telemetry', '.legend', '#status', '#userSolveBtn', '#simpleModeBtn', '.info-button', '#appInfoBtn']) {
       await expect(page.locator(hidden).first(), `${hidden} is hidden`).toBeHidden();
     }
     await expect(page.locator('#simpleGrowBtn')).toBeVisible();

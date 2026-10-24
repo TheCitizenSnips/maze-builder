@@ -57,9 +57,9 @@
       </div>
 
       <div class="nav-actions">
-        <button id="simpleModeBtn" class="simple-mode-button" aria-label="Build and Solve: a picture-only mode for little kids">
+        <button id="simpleModeBtn" class="simple-mode-button" aria-label="Kid Mode: a picture-only mode for little kids">
           <svg><use href="#i-kid"></use></svg>
-          <span>Build &amp; Solve</span>
+          <span>Kid Mode</span>
         </button>
 
         <!-- Build and Solve mode only: a press and hold, so a grown-up can find
@@ -69,9 +69,16 @@
           <span class="hold-caption">Hold for full mode</span>
         </button>
 
-        <div id="offlineBadge" class="status-chip" aria-live="polite">
-          <svg><use href="#i-offline"></use></svg>
-          <span>Web</span>
+        <!-- Offline state and release details for grown-ups, folded behind a
+             small ⓘ until tapped. -->
+        <div class="app-info">
+          <button id="appInfoBtn" class="app-info-button" aria-expanded="false" aria-controls="offlineBadge" aria-label="Offline and version details">
+            <svg><use href="#i-info"></use></svg>
+          </button>
+          <div id="offlineBadge" class="status-chip" aria-live="polite" hidden>
+            <svg><use href="#i-offline"></use></svg>
+            <span>Web</span>
+          </div>
         </div>
       </div>
     </header>
@@ -97,6 +104,9 @@
               <option value="15" selected>15 × 15</option>
               <option value="21">21 × 21</option>
               <option value="25">25 × 25</option>
+              <option value="31">31 × 31</option>
+              <option value="41">41 × 41</option>
+              <option value="51">51 × 51</option>
             </select>
           </label>
 
@@ -162,8 +172,8 @@
             <span class="row-label-icon"><svg><use href="#i-speed"></use></svg> Speed</span>
             <select id="speedSelect" aria-label="Animation speed">
               <option value="110">Slow</option>
-              <option value="38" selected>Medium</option>
-              <option value="10">Fast</option>
+              <option value="38">Medium</option>
+              <option value="10" selected>Fast</option>
               <option value="0">Super fast</option>
             </select>
           </label>
