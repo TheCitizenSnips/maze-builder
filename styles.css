@@ -510,6 +510,27 @@ button { -webkit-tap-highlight-color: transparent; }
 .code-build:active { transform: scale(0.97); }
 .code-build:disabled { opacity: 0.42; cursor: default; transform: none; }
 
+.code-actions {
+  display: flex;
+  justify-content: space-between;
+  margin: 2px -8px 0;
+}
+
+.code-action {
+  appearance: none;
+  min-height: 44px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--blue);
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.code-action:active { opacity: 0.5; }
+.code-action:disabled { color: var(--secondary-label); opacity: 0.6; cursor: default; }
+
 .code-note { padding-bottom: 8px; }
 .code-note.error { color: #d70015; }
 

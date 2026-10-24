@@ -163,10 +163,14 @@
             </summary>
 
             <form id="codeForm" class="code-form">
-              <input id="codeInput" class="code-input" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" placeholder="K7M2QX-hard" aria-label="Maze code">
+              <input id="codeInput" class="code-input" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" placeholder="K7M2Q-X3PAB" aria-label="Maze code">
               <button id="codeBuildBtn" class="code-build" type="submit">Grow</button>
             </form>
-            <p id="codeNote" class="dial-note code-note" aria-live="polite">Every grown maze has a code. Type one in to grow that maze again.</p>
+            <div class="code-actions">
+              <button id="codeCopyBtn" class="code-action" type="button" disabled>Copy code</button>
+              <button id="codePasteBtn" class="code-action" type="button">Paste a code</button>
+            </div>
+            <p id="codeNote" class="dial-note code-note" aria-live="polite">Every grown maze has a code. Type or paste one in to grow that maze again.</p>
           </details>
         </section>
 
@@ -456,7 +460,7 @@
         </ul>
 
         <h3>Maze codes</h3>
-        <p>When the spark picks a square “by chance”, the chances all come from one secret number, called the <strong>seed</strong>. The same seed always makes the same choices, so it grows the same maze. Every maze has a code under <strong>Maze code</strong>: the seed, then the size, style, shape and where S and F are. Type a code in, tap Grow, and the very same maze grows again. Codes are printed under the maze, too.</p>
+        <p>When the spark picks a square “by chance”, the chances all come from one secret number, called the <strong>seed</strong>. The same seed always makes the same choices, so it grows the same maze. Every maze has a code under <strong>Maze code</strong>. Its letters and numbers pack in the seed, the size, the style, the shape and where S and F are. Type or paste a code in, tap Grow, and the very same maze grows again. Codes are printed under the maze, too.</p>
 
         <h3>Easy, Medium and Hard</h3>
         <p>Each level picks a size and sets three dials. You can move the dials yourself under <strong>Maze style</strong>.</p>

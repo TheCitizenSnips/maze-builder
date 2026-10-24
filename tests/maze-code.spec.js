@@ -2,8 +2,12 @@ const { createHash } = require('crypto');
 const { test, expect } = require('@playwright/test');
 const { openApp, readMaze, growMaze, toggleWall, cell } = require('./helpers');
 
-// Every grown maze has a code: its seed plus every setting the planner reads.
-// Typing the code back in must grow exactly the same maze.
+// Every grown maze has a code: its seed plus every setting the planner reads,
+// packed into letters and digits with a check character at the end. Typing
+// the code back in must grow exactly the same maze.
+
+const CODE = /^[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}$/;
+const CODE_WITH_ENDS = /^[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}$/;
 
 const walls = maze => ({ right: maze.right, bottom: maze.bottom, start: maze.start, end: maze.end });
 
@@ -31,8 +35,8 @@ test.describe('Maze codes', () => {
 
     const first = await growMaze(page);
     const code = await currentCode(page);
-    expect(code).toMatch(/^[0-9A-HJKMNP-TV-Z]{6}-medium$/);
-    await expect(page.locator('#codeLabel')).toHaveText(code.slice(0, 6));
+    expect(code).toMatch(CODE);
+    await expect(page.locator('#codeLabel')).toHaveText(code);
 
     // A different maze in between, then the code again.
     await page.click('#blankBtn');
@@ -65,7 +69,7 @@ test.describe('Maze codes', () => {
 
     const first = await growMaze(page);
     const code = await currentCode(page);
-    expect(code).toMatch(new RegExp(`^\\w{6}-21-314-heart-s${spot.r + 1}\\.${spot.c + 1}-f\\d+\\.\\d+$`));
+    expect(code).toMatch(CODE_WITH_ENDS);
 
     // Everything back to something else.
     await page.click('[data-level="easy"]');
@@ -74,6 +78,7 @@ test.describe('Maze codes', () => {
     const again = await growCode(page, code);
     expect(again.size).toBe(21);
     expect(walls(again)).toEqual(walls(first));
+    expect(again.start).toEqual({ r: spot.r, c: spot.c });
     await expect(page.locator('#shapeLabel')).toHaveText('Heart');
     await expect(page.locator('#levelLabel')).toHaveText('Custom');
     expect(await page.locator('#twistyDial').inputValue()).toBe('3');
@@ -89,10 +94,11 @@ test.describe('Maze codes', () => {
     test.skip(testInfo.project.name !== 'desktop', 'Planner behaviour is the same on every screen');
     await openApp(page, { size: 15, speed: 'Super fast' });
     const known = {
-      'K7M2QX-easy': '74c6c5454460',
-      'K7M2QX-medium': '342af42b3fdd',
-      'K7M2QX-hard-heart': 'ab2d8842d239',
-      'K7M2QX-51-213-cat-s10.10-f30.30': '9498b4e7aaa9'
+      // Easy, Medium, Hard in a heart, and 51 × 51 cat with S and F moved.
+      '6HB7H-0AG08': '245461751398',
+      '6HB7H-1CG03': 'fff7c0f324b3',
+      '6HB7H-2S84Q': 'd682d9a78d6f',
+      '6HB7H-6EH0J-9EQ8E': 'cf4173e4f357'
     };
     for (const [code, fingerprint] of Object.entries(known)) {
       const maze = await growCode(page, code);
@@ -103,22 +109,58 @@ test.describe('Maze codes', () => {
     expect(page.mazeErrors).toEqual([]);
   });
 
-  test('a seed on its own grows that seed on the maze as it is set up', async ({ page }, testInfo) => {
+  test('codes forgive case, missing dashes and O for 0, and catch a typo', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop', 'Planner behaviour is the same on every screen');
     await openApp(page, { size: 15, speed: 'Super fast' });
-    const one = await growCode(page, 'k7m2qx');
-    expect(await currentCode(page)).toBe('K7M2QX-medium');
-    await page.click('#blankBtn');
-    // Crockford spelling slips: O for 0, I or L for 1.
-    const two = await growCode(page, 'K7M2QX');
+    const one = await growCode(page, '6HB7H-1CG03');
+    const two = await growCode(page, '6hb7h1cgo3');
     expect(walls(two)).toEqual(walls(one));
+    expect(await currentCode(page)).toBe('6HB7H-1CG03');
 
-    await page.click('[data-level="hard"]');
-    const hard = await growCode(page, ' K7M2QX ');
-    expect(hard.size).toBe(21);
-    expect(await currentCode(page)).toBe('K7M2QX-hard');
+    // One character changed: the check character no longer fits.
+    await page.fill('#codeInput', '6HB7H-1CG04');
+    await page.click('#codeBuildBtn');
+    await expect(page.locator('#codeNote')).toHaveText(/typo/);
+    await expect(page.locator('#phaseLabel')).toHaveText('Ready');
+    expect(walls(await readMaze(page))).toEqual(walls(one));
+    expect(page.mazeErrors).toEqual([]);
+  });
 
-    expect(walls(await growCode(page, 'IO0L1O'))).toEqual(walls(await growCode(page, '100110')));
+  test('every shape gets a code that grows it again', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'Planner behaviour is the same on every screen');
+    test.setTimeout(120_000);
+    await openApp(page, { size: 15, speed: 'Super fast' });
+    await page.locator('#shapeDetails summary').click();
+    const shapes = await page.locator('.shape-tile').evaluateAll(tiles => tiles.map(t => t.dataset.shape));
+    for (const shape of shapes) {
+      await page.locator(`.shape-tile[data-shape="${shape}"]`).click();
+      const first = await growMaze(page);
+      const code = await currentCode(page);
+      expect(code, shape).toMatch(CODE);
+      await page.click('#blankBtn');
+      expect(walls(await growCode(page, code)), shape).toEqual(walls(first));
+    }
+    expect(page.mazeErrors).toEqual([]);
+  });
+
+  test('Copy puts the code on the clipboard and Paste grows a pasted code', async ({ page, context }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'Clipboard permissions are a desktop Chromium setting');
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await openApp(page, { size: 15, speed: 'Super fast' });
+    await openCode(page);
+    await expect(page.locator('#codeCopyBtn')).toBeDisabled();
+    const first = await growMaze(page);
+    const code = await currentCode(page);
+    await page.click('#codeCopyBtn');
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(code);
+
+    await page.click('#blankBtn');
+    // A code inside a message, the way it would arrive from a friend.
+    await page.evaluate(text => navigator.clipboard.writeText(text), `Try this maze: ${code} !`);
+    await page.click('#codePasteBtn');
+    await expect(page.locator('#phaseLabel')).toHaveText('Built', { timeout: 30_000 });
+    expect(walls(await readMaze(page))).toEqual(walls(first));
+    expect(await currentCode(page)).toBe(code);
     expect(page.mazeErrors).toEqual([]);
   });
 
@@ -127,7 +169,7 @@ test.describe('Maze codes', () => {
     const before = await growMaze(page);
     const code = await currentCode(page);
     await openCode(page);
-    for (const bad of ['K7M2', 'K7M2QX-giant', 'K7M2QX-12-213', 'K7M2QX-11-213-heart', 'K7M2QX-medium-s1.1', 'K7M2QX-medium-s1.1-f1.1']) {
+    for (const bad of ['', 'K7M2', 'K7M2Q-X3PAB-Q', 'UUUUU-UUUUU', '6HB7H-1CG04', 'ZZZZZ-ZZZZZ']) {
       await page.fill('#codeInput', bad);
       await page.click('#codeBuildBtn');
       await expect(page.locator('#codeNote')).toHaveClass(/error/);
