@@ -72,12 +72,17 @@
         <!-- Offline state and release details for grown-ups, folded behind a
              small ⓘ until tapped. -->
         <div class="app-info">
-          <button id="appInfoBtn" class="app-info-button" aria-expanded="false" aria-controls="offlineBadge" aria-label="Offline and version details">
+          <button id="appInfoBtn" class="app-info-button" aria-expanded="false" aria-controls="appInfoPanel" aria-label="Offline, version and reset">
             <svg><use href="#i-info"></use></svg>
           </button>
-          <div id="offlineBadge" class="status-chip" aria-live="polite" hidden>
-            <svg><use href="#i-offline"></use></svg>
-            <span>Web</span>
+          <div id="appInfoPanel" class="app-info-panel" hidden>
+            <div id="offlineBadge" class="status-chip" aria-live="polite">
+              <svg><use href="#i-offline"></use></svg>
+              <span>Web</span>
+            </div>
+            <!-- Puts every remembered choice (size, speed, level, shape, colours,
+                 Kid Mode) back to how the app first opened. Asks for a second tap. -->
+            <button id="resetOptionsBtn" class="reset-options-button">Reset all options</button>
           </div>
         </div>
       </div>
@@ -271,9 +276,15 @@
           <span><i class="swatch build"></i>Growing</span>
           <span><i class="swatch start"></i>Start</span>
           <span><i class="swatch end"></i>Finish</span>
-          <span><i class="swatch frontier"></i>Frontier</span>
-          <span><i class="swatch visited"></i>Explored</span>
-          <span><i class="swatch solution"></i>Shortest path</span>
+          <!-- The search colours are a child's to pick: a tap opens a small
+               palette under the one tapped. -->
+          <button class="legend-pick" data-trace="frontier" aria-haspopup="true" aria-expanded="false" aria-controls="tracePalette" title="Pick a colour"><i class="swatch frontier"></i>Frontier</button>
+          <button class="legend-pick" data-trace="visited" aria-haspopup="true" aria-expanded="false" aria-controls="tracePalette" title="Pick a colour"><i class="swatch visited"></i>Explored</button>
+          <button class="legend-pick" data-trace="solution" aria-haspopup="true" aria-expanded="false" aria-controls="tracePalette" title="Pick a colour"><i class="swatch solution"></i>Shortest path</button>
+          <div id="tracePalette" class="trace-palette" hidden>
+            <div id="tracePaletteTitle" class="trace-palette-title">Frontier colour</div>
+            <div id="tracePaletteSwatches" class="trace-palette-swatches" role="radiogroup" aria-labelledby="tracePaletteTitle"></div>
+          </div>
         </div>
 
         <div class="maze-card">
@@ -484,9 +495,11 @@
         <h3>Colours you will see</h3>
         <ul class="info-colours">
           <li><i class="swatch frontier"></i><span><strong>Frontier</strong> is the edge of the wave: the next squares to check.</span></li>
-          <li><i class="swatch visited"></i><span><strong>Explored</strong> squares were already checked. They stay blue so you can see every place the search tried.</span></li>
+          <li><i class="swatch visited"></i><span><strong>Explored</strong> squares were already checked. They keep their colour so you can see every place the search tried.</span></li>
           <li><i class="swatch solution"></i><span><strong>Shortest path</strong> is the one route the computer keeps.</span></li>
         </ul>
+
+        <p class="info-hint">Tap a colour in the key above the maze to pick your own colour for it.</p>
 
         <h3>The numbers</h3>
         <dl class="info-terms">

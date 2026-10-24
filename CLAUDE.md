@@ -290,6 +290,10 @@ Keep colors semantically stable:
 
 Do not randomly change these meanings from screen to screen.
 
+### Trace colours a child picks
+
+The three search colours (Frontier, Explored, Shortest path) are the child's to choose: tapping one in the key above the maze opens a small palette (`TRACE_HUES` in `app.js`). Each hue comes in the shade for its job (soft for explored, brighter for the wave, strongest for the route), so the route still stands out when two traces share a hue. The picks are remembered like other settings; the defaults are the cyan, blue and gold above. Walls, Start and Finish keep their fixed colours. Reset all options, folded behind the ⓘ at the top right, forgets every remembered choice after a second tap.
+
 ---
 
 ## 9. Surfaces and layout
