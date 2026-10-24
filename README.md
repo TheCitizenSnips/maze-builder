@@ -76,10 +76,10 @@ piece; the outline is the outside wall, and growing, searching, solving and
 drawing walls all stay inside it. Start and Finish begin far apart inside the
 shape and can still be moved.
 
-## Build & Solve mode (for little kids)
+## Kid Mode (for little kids)
 
 A picture-only way to play for children who cannot read yet. Tap the
-smiley **Build & Solve** button at the top to turn it on. The words,
+smiley **Kid Mode** button at the top to turn it on. The words,
 settings and numbers step aside, a maze grows on its own, and then S glows
 to show where to start drawing. Three big picture buttons sit under the maze:
 the sparkle grows a new maze, the round arrow wipes the line to draw again, and
@@ -89,7 +89,8 @@ straight away (on an 11 × 11 grid it grows to 15 × 15 first).
 Finishing shows a trophy, confetti and the same two buttons.
 
 The maze uses the size, level and speed last chosen in full mode, so a
-grown-up can pick Easy and Medium speed first.
+grown-up can pick Easy and Medium speed first (speed starts on Fast until
+someone picks another).
 
 To go back to full mode, **press and hold** the button in the top corner
 until its ring fills (about a second and a half). A quick tap does nothing,
@@ -162,9 +163,9 @@ be set to:
 
 **Settings → Pages → Source → GitHub Actions**
 
-The stamp is the short commit id and commit time. The offline badge shows it
-(for example "Offline ready · Oct 20, 4:07 AM · 8e4b569"), so you can tell at a
-glance which release a device is running. Local copies show no version. If a
+The stamp is the short commit id and commit time. Tap the small ⓘ at the top
+right to see it with the offline state (for example "Offline ready · Oct 20,
+4:07 AM · 8e4b569"), so you can tell which release a device is running. Local copies show no version. If a
 device ever ends up with a page and script from different releases, the app
 notices the mismatch and reloads once for matching copies.
 

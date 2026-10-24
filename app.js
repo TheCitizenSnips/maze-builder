@@ -44,6 +44,7 @@
   const pauseBtn = byId('pauseBtn');
   const offlineBadge = byId('offlineBadge');
   const offlineBadgeText = offlineBadge && offlineBadge.querySelector('span');
+  const appInfoBtn = byId('appInfoBtn');
 
   const metricProgress = byId('metricProgress');
   const metricExplored = byId('metricExplored');
@@ -326,8 +327,16 @@
 
   // Sleep for one animation beat, then hold while paused. Returns false when
   // the run was cancelled or replaced so stale callers stop touching the grid.
+  // Beats shorter than a frame are saved up and slept together, so a big
+  // grid's tiny steps keep their speed instead of each waiting on the timer
+  // (and the screen) on its own.
+  let owedBeat = 0;
   async function pace(ms, myRunId) {
-    await sleep(ms);
+    owedBeat += ms;
+    if (owedBeat >= 16) {
+      await sleep(owedBeat);
+      owedBeat = 0;
+    }
     await waitWhilePaused(myRunId);
     return running && myRunId === runId;
   }
@@ -347,6 +356,20 @@
   // still finishes while a child is watching; small mazes keep full speed.
   function growthDelay() {
     return currentDelay() * Math.min(1, Math.sqrt(121 / insideCount));
+  }
+
+  // The shortest beat for the tip walking back. Past 25 × 25 it shortens too,
+  // so a 51 × 51 maze, four times the squares, grows in about three times
+  // as long as a 25 × 25 one.
+  function retreatBeat() {
+    return Math.max(6 * Math.min(1, Math.sqrt(625 / insideCount)), growthDelay() * 0.45);
+  }
+
+  // The search wave and the gold trace move one distance step per beat, and
+  // the route through a grid past 25 × 25 gets far longer. Shorten those
+  // beats in step so a 51 × 51 search takes about as long as a 25 × 25 one.
+  function searchBeat(ms) {
+    return ms * Math.min(1, 625 / insideCount);
   }
 
   // On a phone or portrait iPad the controls sit above the maze, so the
@@ -1404,7 +1427,7 @@
         for (let i = 0; i < step.path.length; i++) {
           moveHead(step.path[i]);
           // Long trips back speed up after the first few steps.
-          const beat = Math.max(6, growthDelay() * 0.45) / (i < 3 ? 1 : 3);
+          const beat = retreatBeat() / (i < 3 ? 1 : 3);
           if (!(await pace(beat, myRunId))) return;
         }
       } else if (step.type === 'rest') {
@@ -1412,7 +1435,7 @@
         grid[head.r][head.c].carveHead = false;
         grid[head.r][head.c].carveTrail = true;
         updateCell(head.r, head.c);
-        if (!(await pace(Math.max(6, growthDelay() * 0.45), myRunId))) return;
+        if (!(await pace(retreatBeat(), myRunId))) return;
       } else if (step.type === 'shortcut') {
         announceShortcuts();
         setWall(edgeBetween(step.a, step.b), false, { zap: true });
@@ -1569,7 +1592,7 @@
         'Searching'
       );
 
-      if (!(await pace(Math.max(70, currentDelay() * 2.2), myRunId))) return;
+      if (!(await pace(searchBeat(Math.max(70, currentDelay() * 2.2)), myRunId))) return;
 
       for (const p of layer) {
         grid[p.r][p.c].newFrontier = false;
@@ -1578,7 +1601,7 @@
         updateCell(p.r, p.c);
       }
 
-      if (!(await pace(Math.max(30, currentDelay() * 0.8), myRunId))) return;
+      if (!(await pace(searchBeat(Math.max(30, currentDelay() * 0.8)), myRunId))) return;
 
       for (const p of layer) {
         grid[p.r][p.c].current = false;
@@ -1607,7 +1630,7 @@
         break;
       }
 
-      if (!(await pace(Math.max(25, currentDelay() * 0.45), myRunId))) return;
+      if (!(await pace(searchBeat(Math.max(25, currentDelay() * 0.45)), myRunId))) return;
     }
 
     if (!result.found) {
@@ -1628,7 +1651,7 @@
 
     setStatus('Tracing the shortest route from start to finish. Gold is the path we keep.', 'Tracing');
 
-    const pathDelay = Math.max(45, currentDelay() * 1.35);
+    const pathDelay = searchBeat(Math.max(45, currentDelay() * 1.35));
 
     for (let i = 0; i < result.path.length; i++) {
       if (!running || myRunId !== runId) return;
@@ -2728,6 +2751,20 @@
 
   speedSelect.addEventListener('change', saveSettings);
 
+  // The ⓘ in the top bar folds the offline state and release away; a tap
+  // shows them, and a tap anywhere else or Escape folds them again.
+  function setAppInfoOpen(open) {
+    offlineBadge.hidden = !open;
+    appInfoBtn.setAttribute('aria-expanded', String(open));
+  }
+  appInfoBtn.addEventListener('click', () => setAppInfoOpen(offlineBadge.hidden));
+  document.addEventListener('pointerdown', e => {
+    if (!offlineBadge.hidden && !e.target.closest('.app-info')) setAppInfoOpen(false);
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !offlineBadge.hidden) setAppInfoOpen(false);
+  });
+
   for (const btn of levelButtons) {
     btn.addEventListener('click', () => applyLevel(btn.dataset.level));
   }
@@ -2951,7 +2988,6 @@
 
   // The release shown next to the offline state: the commit's date and time
   // on this device's clock, then the short commit id that matches GitHub.
-  // A phone shows the date only so the badge stays on one line.
   function showRelease() {
     if (!isStamped(BUILD)) return;
     const [commit, time] = BUILD.split('|');

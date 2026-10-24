@@ -177,7 +177,7 @@ Expected structure:
     └── icon-maskable-512.png
 ```
 
-GitHub Pages publishes from the `.github/workflows/pages.yml` workflow on every push to `main` (Settings → Pages → Source → GitHub Actions). It publishes the repository root as is, minus the test tooling. Its one change is the release stamp: it replaces `__MAZE_BUILD__` in `index.html` and `app.js` with `<commit>|<commit time>`, which the offline badge shows and which lets the app detect a page and script from different releases. Keep the placeholder in both files; there is no version to bump by hand.
+GitHub Pages publishes from the `.github/workflows/pages.yml` workflow on every push to `main` (Settings → Pages → Source → GitHub Actions). It publishes the repository root as is, minus the test tooling. Its one change is the release stamp: it replaces `__MAZE_BUILD__` in `index.html` and `app.js` with `<commit>|<commit time>`, which the offline badge (folded behind the ⓘ at the top right, `#appInfoBtn`) shows and which lets the app detect a page and script from different releases. Keep the placeholder in both files; there is no version to bump by hand.
 
 The live published app is:
 
@@ -411,7 +411,7 @@ Do not require Pencil-specific proprietary APIs when standard Pointer Events are
 
 The maze fits its window by default (`.maze-viewport`, sized from `--fit-cell`). A two-finger pinch on the grid, Ctrl + scroll or a trackpad pinch on a computer, or the zoom buttons under the maze (zoom out, zoom in, fit) make the squares bigger inside that same window (`--zoom` multiplies the square size, so walls stay crisp and `mazeGeometry` needs no zoom maths); two fingers then drag it around. One finger always draws, solves or edits, and Pencil and mouse never pinch.
 
-A second finger is kept from the maze. It only starts a pinch once it slides, so a resting palm does not interrupt a line. When both fingers land together before the first has moved, whatever the first finger just did (a wall, a moved S or F, the start of a line) is put back; a later pinch pauses the line as a lift would. A new grid size returns to fit, and printing always shows the whole maze. In Build and Solve mode the zoom bar is hidden and a white fit picture button appears at the end of the button row while zoomed.
+A second finger is kept from the maze. It only starts a pinch once it slides, so a resting palm does not interrupt a line. When both fingers land together before the first has moved, whatever the first finger just did (a wall, a moved S or F, the start of a line) is put back; a later pinch pauses the line as a lift would. A new grid size returns to fit, and printing always shows the whole maze. In Kid Mode the zoom bar is hidden and a white fit picture button appears at the end of the button row while zoomed.
 
 ---
 
@@ -942,6 +942,8 @@ Current modes conceptually include:
 - Fast
 - Super fast
 
+Fast is the default until the user picks another speed (saved like other settings).
+
 Super fast grows a maze as a short fast-forward of the same plan (about a second of playback, driven by the clock rather than per-step delays), so even the hardest 25 × 25 maze is built in under 2.5 seconds. The tip still visibly travels and retreats; only the pauses go. `tests/super-fast.spec.js` holds that time limit.
 
 Changing speed should affect algorithm animations without breaking correctness.
@@ -990,9 +992,9 @@ With edge walls every square is traversable, so S and F can be placed on any squ
 
 ---
 
-## 40a. Build and Solve mode
+## 40a. Kid Mode (Build and Solve)
 
-A remembered setting (`simple` in `mazeBuilder.settings`) for children who cannot read. Full mode is the default. One tap on the smiley button turns it on; leaving takes a press and hold on the corner button, so a toddler cannot leave by accident. While it is on, `html.simple-mode` hides every word, setting and metric; a maze grows on its own and drawing starts straight after, with S (or the end of a lifted line) pulsing as the only cue. The orange shape button opens big `.simple-shape-tile` pictures; one tap picks that shape and grows a new maze in it. The success sheet leads with pictures a child can read (one to three stars on the same tiers as section 34, a blue bar for their line beside a gold bar for the shortest, and the suggested next button glowing: New maze after a perfect route, Try again otherwise), with short words and numbers underneath for an older sibling giving pointers. Keep this mode free of text the child must read, and give any new full-mode feature a thought here too.
+Shown to the user as **Kid Mode** (the counterpart of full mode); the code still calls it simple mode. A remembered setting (`simple` in `mazeBuilder.settings`) for children who cannot read. Full mode is the default. One tap on the smiley button turns it on; leaving takes a press and hold on the corner button, so a toddler cannot leave by accident. While it is on, `html.simple-mode` hides every word, setting and metric; a maze grows on its own and drawing starts straight after, with S (or the end of a lifted line) pulsing as the only cue. The orange shape button opens big `.simple-shape-tile` pictures; one tap picks that shape and grows a new maze in it. The success sheet leads with pictures a child can read (one to three stars on the same tiers as section 34, a blue bar for their line beside a gold bar for the shortest, and the suggested next button glowing: New maze after a perfect route, Try again otherwise), with short words and numbers underneath for an older sibling giving pointers. Keep this mode free of text the child must read, and give any new full-mode feature a thought here too.
 
 ---
 
@@ -1164,7 +1166,7 @@ Do not implement Apple Pencil behavior using only `touchmove`.
 
 ## 51. Performance
 
-The maze sizes are deliberately modest.
+The maze sizes are deliberately modest, with bigger boards for zooming in.
 
 Current options:
 
@@ -1172,6 +1174,11 @@ Current options:
 - 15 × 15
 - 21 × 21
 - 25 × 25
+- 31 × 31
+- 41 × 41
+- 51 × 51 (the cap: about as many squares as an iPad can show and animate smoothly)
+
+At fit size a 51 × 51 maze has squares of about 6px on a phone; zoom makes them usable. Past 25 × 25 the growth retreat beat and the search and trace beats shorten with the grid (`retreatBeat`, `searchBeat`), and `pace` saves up beats shorter than a frame, so big mazes still finish while a child watches. `tests/big-sizes.spec.js` covers this.
 
 Animations should remain smooth at the largest supported size on contemporary iOS devices.
 
@@ -1291,7 +1298,7 @@ New features must coexist with:
 - BFS discovery animation
 - instant solve
 - self-solve/Pencil mode
-- Build and Solve (picture-only) mode
+- Kid Mode (picture-only Build and Solve) mode
 - wall editing
 - Start/Finish editing
 - printing
