@@ -76,6 +76,31 @@ piece; the outline is the outside wall, and growing, searching, solving and
 drawing walls all stay inside it. Start and Finish begin far apart inside the
 shape and can still be moved.
 
+## Maze codes
+
+Every grown maze has a code, shown under **Maze code** in the Maze card and
+printed small under the maze. Typing or pasting a code and tapping **Grow**
+grows that exact maze again, on any device: the same size, Maze style, shape,
+Start, Finish and walls. **Copy code** puts the current code on the clipboard
+for a message; **Paste a code** grows the code in a pasted message straight
+away (iOS asks first with its small Paste bubble).
+
+A code is ten letters and digits, or fifteen when S or F was moved:
+
+```text
+K7M2Q-X3PAB
+K7M2Q-X3PAB-4FQ2Z
+```
+
+It packs the maze's seed (the number behind every chance the generator
+takes) with the size, the three style dials, the shape and, when moved, the S
+and F squares. The last character checks the others, so a typo says so
+instead of growing some other maze. Case and dashes do not matter, and O, I
+and L read as 0, 1 and 1. Drawing a wall or moving S or F after growing makes
+a maze the code would not rebuild, so the code goes away until the next grow.
+`tests/maze-code.spec.js` pins a few codes to their mazes, so a change that
+would make old printed codes grow different mazes shows up as a failing test.
+
 ## Kid Mode (for little kids)
 
 A picture-only way to play for children who cannot read yet. Tap the
@@ -146,6 +171,10 @@ Other handy commands:
   for any failure.
 - `npm run serve` serves the app at http://localhost:4173/maze-builder/ for
   trying it by hand.
+
+GitHub also runs the whole suite on every pull request and every push to
+`main` (`.github/workflows/test.yml`); the result shows as the **Tests**
+check on the pull request, with the report attached when something fails.
 
 The tests cover editing, maze growth (every grown maze is checked to be a
 real, fully connected maze), the search wave and its gold shortest path,
