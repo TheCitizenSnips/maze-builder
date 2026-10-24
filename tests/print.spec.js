@@ -143,13 +143,24 @@ test.describe('Printing', () => {
         prints: window.printCalls,
         gold: colourAt(+gold.dataset.r, +gold.dataset.c, 0.25, 0.25),
         plain: colourAt(+plain.dataset.r, +plain.dataset.c, 0.25, 0.25),
-        start: colourAt(+start.dataset.r, +start.dataset.c, 0.2, 0.8)
+        start: colourAt(+start.dataset.r, +start.dataset.c, 0.2, 0.8),
+        // Ink in the strip under the maze, where the maze code is written.
+        codeInk: (() => {
+          const below = img.width - inset + 8;
+          const band = ctx.getImageData(0, below, img.width, img.height - below).data;
+          let ink = 0;
+          for (let i = 0; i < band.length; i += 4) if (band[i] < 200) ink++;
+          return ink;
+        })()
       };
     });
     expect(picture.name).toBe('maze.png');
     expect(picture.type).toBe('image/png');
     expect(picture.width).toBe(11 * 64 + 2 * picture.inset);
-    expect(picture.height).toBe(picture.width);
+    // The square maze, then a strip under it for the maze code.
+    expect(picture.height).toBeGreaterThan(picture.width);
+    expect(picture.height).toBeLessThan(picture.width * 1.05);
+    expect(picture.codeInk).toBeGreaterThan(50);
     expect(picture.prints).toBe(0);
     expect(picture.gold).toBe('255,214,10');
     expect(picture.plain).toBe('255,255,255');

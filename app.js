@@ -32,6 +32,13 @@
   const shapeIcon = byId('shapeIcon');
   const shapeLabel = byId('shapeLabel');
   const shapeNote = byId('shapeNote');
+  const codeDetails = byId('codeDetails');
+  const codeLabel = byId('codeLabel');
+  const codeForm = byId('codeForm');
+  const codeInput = byId('codeInput');
+  const codeBuildBtn = byId('codeBuildBtn');
+  const codeNote = byId('codeNote');
+  const printCode = byId('printCode');
   // The shape pictures and masks come from shapes.js, loaded just before.
   const Shapes = window.MazeShapes;
   const dials = {
@@ -270,6 +277,9 @@
   let wallEls = { right: [], bottom: [] };
   let start = null;
   let end = null;
+  // The settings and seed the maze on screen grew from, while it is still
+  // that maze; null for a blank or hand-edited one.
+  let grownMaze = null;
   let mode = 'draw';
   let drawing = false;
   let drawValue = true;
@@ -454,6 +464,7 @@
     buttons.start.disabled = disabled;
     buttons.end.disabled = disabled;
     document.getElementById('generateBtn').disabled = disabled;
+    codeBuildBtn.disabled = disabled;
     document.getElementById('animateBtn').disabled = disabled;
     document.getElementById('instantBtn').disabled = disabled;
     document.getElementById('blankBtn').disabled = disabled;
@@ -661,6 +672,7 @@
     walls = makeWalls(false);
 
     ({ start, end } = Shapes.ends(shapeId, size));
+    setGrownMaze(null);
 
     render();
     resetMetrics();
@@ -921,6 +933,7 @@
 
     if (mode === 'start') start = { r: p.r, c: p.c };
     else end = { r: p.r, c: p.c };
+    setGrownMaze(null);
     clearSearchMarks();
     render();
     resetMetrics();
@@ -948,6 +961,7 @@
     if (hasWall(edge) !== drawValue) {
       if (strokeEdges) strokeEdges.push({ edge, was: !drawValue });
       setWall(edge, drawValue);
+      setGrownMaze(null);
     }
     lastPainted = edgeKey(edge);
   }
@@ -982,10 +996,11 @@
       const p = pointCell(e.clientX, e.clientY, geo);
       if (!p) return;
       e.preventDefault();
-      const before = { start, end, mode };
+      const before = { start, end, mode, grown: grownMaze };
       placeMarker(p);
       strokeUndo = () => {
         ({ start, end } = before);
+        setGrownMaze(before.grown);
         render();
         setMode(before.mode);
       };
@@ -1006,8 +1021,10 @@
     drawLastPoint = { x: e.clientX, y: e.clientY };
     try { mazeEl.setPointerCapture(e.pointerId); } catch (_) {}
     const changed = strokeEdges = [];
+    const grownBefore = grownMaze;
     strokeUndo = () => {
       for (const step of changed.reverse()) setWall(step.edge, step.was);
+      setGrownMaze(grownBefore);
     };
     paintEdge(edge, true);
   });
@@ -1057,6 +1074,190 @@
   window.addEventListener('pointerup', endDrawStroke);
   window.addEventListener('pointercancel', endDrawStroke);
 
+  // Seeds and maze codes. Every grown maze comes from a seed: a number that
+  // drives each chance the planner takes, so the same seed with the same
+  // settings grows exactly the same maze. A maze code is the seed followed
+  // by everything else the planner reads (size, Maze style, shape, and where
+  // S and F sit), so a code on its own rebuilds the maze:
+  //
+  //   K7M2QX-hard                 seed and level
+  //   K7M2QX-25-213-heart         seed, size, dials (twisty, shortcuts, branches), shape
+  //   K7M2QX-medium-s3.4-f15.12   S and F (row.column, counted from 1),
+  //                               only when they are not where a fresh grid puts them
+  //
+  // The seed is always first: six letters and digits in Crockford's base 32,
+  // which leaves out I, L, O and U, so it reads off a page and types back in
+  // without mix-ups. The other parts can come in any order. A seed on its own
+  // grows that seed on the maze as it is set up now. Codes are lowercase
+  // words, digits, dots and dashes, so a link can carry one as it is.
+  const SEED_DIGITS = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+  const SEED_LENGTH = 6;
+  const SEED_RANGE = 2 ** (5 * SEED_LENGTH);
+
+  function randomSeed() {
+    const bits = new Uint32Array(1);
+    crypto.getRandomValues(bits);
+    return bits[0] % SEED_RANGE;
+  }
+
+  function seedText(seed) {
+    let text = '';
+    for (let i = 0; i < SEED_LENGTH; i++) {
+      text = SEED_DIGITS[seed % 32] + text;
+      seed = Math.floor(seed / 32);
+    }
+    return text;
+  }
+
+  // The seed a typed word stands for, or null. O reads as 0, and I and L as 1,
+  // the way Crockford's base 32 forgives them.
+  function seedNumber(text) {
+    const typed = text.toUpperCase().replace(/O/g, '0').replace(/[IL]/g, '1');
+    if (typed.length !== SEED_LENGTH) return null;
+    let seed = 0;
+    for (const ch of typed) {
+      const digit = SEED_DIGITS.indexOf(ch);
+      if (digit < 0) return null;
+      seed = seed * 32 + digit;
+    }
+    return seed;
+  }
+
+  // A small, fast random number source (mulberry32) that gives the same run
+  // of numbers in 0 to 1 for the same seed on every device.
+  function seededRandom(seed) {
+    let a = seed >>> 0;
+    return () => {
+      a = (a + 0x6d2b79f5) >>> 0;
+      let t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  // A 32-bit number for a piece of text (FNV-1a), for seeding from a setting.
+  function hashText(text) {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < text.length; i++) {
+      h ^= text.charCodeAt(i);
+      h = Math.imul(h, 0x01000193);
+    }
+    return h >>> 0;
+  }
+
+  const samePoint = (a, b) => a.r === b.r && a.c === b.c;
+  const pointText = p => `${p.r + 1}.${p.c + 1}`;
+
+  // The code for a maze: { seed, size, style, shape, start, end }.
+  function formatMazeCode(maze) {
+    const parts = [seedText(maze.seed)];
+    const level = Object.keys(LEVELS).find(name => {
+      const l = LEVELS[name];
+      return l.size === maze.size && l.twisty === maze.style.twisty &&
+        l.shortcuts === maze.style.shortcuts && l.branches === maze.style.branches;
+    });
+    if (level) parts.push(level);
+    else parts.push(String(maze.size), `${maze.style.twisty}${maze.style.shortcuts}${maze.style.branches}`);
+    if (maze.shape !== 'square') parts.push(maze.shape);
+    const ends = Shapes.ends(maze.shape, maze.size);
+    if (!samePoint(maze.start, ends.start) || !samePoint(maze.end, ends.end)) {
+      parts.push(`s${pointText(maze.start)}`, `f${pointText(maze.end)}`);
+    }
+    return parts.join('-');
+  }
+
+  // Reads a typed code. Returns { maze } with every setting filled in, or
+  // { error } with a sentence saying what is wrong. A seed on its own takes
+  // the rest from `now`, the maze as it is set up on screen.
+  function readMazeCode(text, now) {
+    const tokens = String(text).trim().toLowerCase().split(/[\s,–—-]+/).filter(Boolean);
+    if (!tokens.length) return { error: 'Type a maze code first, like K7M2QX-hard.' };
+    const seed = seedNumber(tokens[0]);
+    if (seed === null) return { error: 'A maze code starts with six letters and numbers, like K7M2QX.' };
+    if (tokens.length === 1) return { maze: { ...now, seed } };
+
+    let level = null, size = null, style = null, shape = null, s = null, f = null;
+    const sizes = [...sizeSelect.options].map(option => Number(option.value));
+    for (const token of tokens.slice(1)) {
+      const point = /^([sf])(\d+)\.(\d+)$/.exec(token);
+      if (Object.hasOwn(LEVELS, token) && !level) level = LEVELS[token];
+      else if (/^[0-4]{3}$/.test(token) && !style) style = { twisty: +token[0], shortcuts: +token[1], branches: +token[2] };
+      else if (/^\d{1,2}$/.test(token) && size === null) size = Number(token);
+      else if (Shapes.has(token) && token !== 'square' && !shape) shape = token;
+      else if (point && !(point[1] === 's' ? s : f)) {
+        const p = { r: Number(point[2]) - 1, c: Number(point[3]) - 1 };
+        if (point[1] === 's') s = p; else f = p;
+      } else return { error: `This code has a part the app does not know: “${token}”.` };
+    }
+
+    if (level && (size !== null || style)) return { error: 'A code has a level, or a size and a style, but not both.' };
+    if (level) {
+      size = level.size;
+      style = { twisty: level.twisty, shortcuts: level.shortcuts, branches: level.branches };
+    }
+    if (size === null || !style) return { error: 'After the seed, a code needs a level (like hard) or a size and a style (like 25-213).' };
+    if (!sizes.includes(size)) return { error: `Maze codes can use the sizes ${sizes.join(', ')}.` };
+    shape = shape || 'square';
+    if (shape !== 'square' && size < Shapes.minSize) return { error: `Shapes need ${Shapes.minSize} × ${Shapes.minSize} or bigger.` };
+    if (!s !== !f) return { error: 'A code that moves S also says where F goes, and the other way round.' };
+
+    const ends = Shapes.ends(shape, size);
+    const shapeMask = Shapes.mask(shape, size);
+    const inShape = p => p.r >= 0 && p.c >= 0 && p.r < size && p.c < size && shapeMask[p.r][p.c];
+    if (s && (!inShape(s) || !inShape(f))) return { error: 'S or F in this code is outside the maze.' };
+    if (s && samePoint(s, f)) return { error: 'S and F in this code are on the same square.' };
+    return { maze: { seed, size, style, shape, start: s || ends.start, end: f || ends.end } };
+  }
+
+  // Shows the code for the maze on screen, beside "Maze code" and on the
+  // printed page. Drawing a wall or moving S or F after growing makes a
+  // maze the code would not rebuild, so the code goes away until the next grow.
+  function setGrownMaze(maze) {
+    grownMaze = maze;
+    const code = maze ? formatMazeCode(maze) : '';
+    codeLabel.textContent = maze ? seedText(maze.seed) : 'None';
+    if (document.activeElement !== codeInput) codeInput.value = code;
+    printCode.textContent = maze ? `Maze code ${code}` : '';
+  }
+
+  function showCodeNote(message, isError = false) {
+    codeNote.textContent = message;
+    codeNote.classList.toggle('error', isError);
+  }
+
+  const CODE_NOTE = 'Every grown maze has a code. Type one in to grow that maze again.';
+
+  // Sets the app up the way a code says (size, style, shape, S and F), then
+  // grows the maze from its seed.
+  function growFromCode(text) {
+    if (running) return;
+    const read = readMazeCode(text, {
+      size, style: mazeStyle(), shape: shapeId, start: { ...start }, end: { ...end }
+    });
+    if (read.error) {
+      showCodeNote(read.error, true);
+      setStatus(read.error, 'Ready');
+      return;
+    }
+    const maze = read.maze;
+    for (const name of Object.keys(dials)) dials[name].value = String(maze.style[name]);
+    if (maze.size !== size || maze.shape !== shapeId) {
+      size = maze.size;
+      sizeSelect.value = String(size);
+      shapeId = maze.shape;
+      makeBlankGrid();
+    }
+    start = maze.start;
+    end = maze.end;
+    syncLevelUI();
+    syncShapeUI();
+    saveSettings();
+    showCodeNote(CODE_NOTE);
+    codeInput.blur();
+    animateMazeGrowth(maze.seed);
+  }
+
   // A grown maze is planned in full first, then the plan is played back as
   // the growth animation. Planning first lets us check the finished maze
   // (S and E wherever the child put them) and quietly try again when the
@@ -1073,7 +1274,10 @@
   // `shape` is the mask of squares the maze fills (all of them when left
   // out). The tip only ever carves into squares inside it, so the outline
   // stays a wall and the maze fills the shape exactly.
-  function planMaze(n, style, from, to, minRoute = 0, { giveUpWhenShort = false, shape = null } = {}) {
+  //
+  // `random` stands in for Math.random: every chance the planner takes comes
+  // from it, so a seeded one makes the same plan every time.
+  function planMaze(n, style, from, to, minRoute = 0, { giveUpWhenShort = false, shape = null, random = Math.random } = {}) {
     const straightWeight = STRAIGHT_WEIGHT[style.twisty];
     const branchChance = BRANCH_CHANCE[style.branches];
     const steps = [];
@@ -1120,7 +1324,7 @@
         const straight = q.r - cur.r === cur.r - back.r && q.c - cur.c === cur.c - back.c;
         return straight ? straightWeight : 1;
       });
-      let roll = Math.random() * weights.reduce((a, b) => a + b, 0);
+      let roll = random() * weights.reduce((a, b) => a + b, 0);
       for (let i = 0; i < choices.length; i++) {
         roll -= weights[i];
         if (roll < 0) return choices[i];
@@ -1161,11 +1365,11 @@
 
       // Branches dial: sometimes leave this corridor for later and start a
       // side path from a square carved a moment ago.
-      if (branchChance && stack.length > 1 && Math.random() < branchChance) {
+      if (branchChance && stack.length > 1 && random() < branchChance) {
         const recent = stack.slice(Math.max(0, stack.length - 1 - BRANCH_WINDOW), stack.length - 1);
         const options = recent.filter(p => uncarvedNeighbours(p).length);
         if (options.length) {
-          const target = options[Math.floor(Math.random() * options.length)];
+          const target = options[Math.floor(random() * options.length)];
           stack.splice(stack.indexOf(target), 1);
           stack.push(target);
           steps.push({ type: 'move', from: cur, path: treePath(cur, target), carved: carvedCount, stack: stack.length });
@@ -1196,7 +1400,7 @@
     // where possible, so a wrong turn is less of a trap. A shortcut that
     // would cut the S-to-E route below minRoute is put back and another
     // tried, so shortcuts never turn the maze into a short hop.
-    const pick = list => list[Math.floor(Math.random() * list.length)];
+    const pick = list => list[Math.floor(random() * list.length)];
     const refused = new Set();
     const closedSides = p => !inside(p) ? [] : near(p).filter(q =>
       !isOpen(p, q) && !direct(p, q) && !refused.has(edgeKey(edgeBetween(p, q)))
@@ -1272,16 +1476,19 @@
   // How long the S-to-E route usually is when S and E sit where a fresh
   // grid puts them (opposite corners of a square, far ends of a shape), for
   // this size, shape and Maze style. Worked out once per setting from a
-  // handful of sample plans, so it follows the level and the dials.
+  // handful of sample plans, so it follows the level and the dials. The
+  // samples are seeded from the setting itself, so the answer is the same on
+  // every device and a maze code always gets the same shortcut limit.
   const cornerRouteCache = new Map();
   function typicalCornerRoute(n, style, shapeName) {
     const cacheKey = `${n}:${shapeName}:${style.twisty}:${style.shortcuts}:${style.branches}`;
     if (!cornerRouteCache.has(cacheKey)) {
       const shape = Shapes.mask(shapeName, n);
       const ends = Shapes.ends(shapeName, n);
+      const random = seededRandom(hashText(cacheKey));
       const routes = [];
       for (let i = 0; i < 9; i++) {
-        routes.push(planMaze(n, style, ends.start, ends.end, 0, { shape }).route);
+        routes.push(planMaze(n, style, ends.start, ends.end, 0, { shape, random }).route);
       }
       routes.sort((a, b) => a - b);
       cornerRouteCache.set(cacheKey, routes[Math.floor(routes.length / 2)]);
@@ -1295,22 +1502,34 @@
   // already steer clear of cutting the route short; when the corridors
   // themselves join S and E too soon, plan again. After a short time it
   // settles for the next maze, whatever its route.
+  //
+  // Each try is a fresh seed, and the plan keeps the seed it was grown from.
+  // A seed that passed plans the same maze again in one go, so a maze code
+  // (`seed` given) skips the search and builds its maze straight away.
   const PLAN_BUDGET_MS = 150;
-  function planLongMaze(n, style, from, to) {
+  function planLongMaze(n, style, from, to, seed = null) {
     const shape = Shapes.mask(shapeId, n);
     const wanted = Math.floor(typicalCornerRoute(n, style, shapeId) / 2);
+    const plan = (seed, giveUpWhenShort = false) => ({
+      ...planMaze(n, style, from, to, wanted, { giveUpWhenShort, shape, random: seededRandom(seed) }),
+      seed
+    });
+    if (seed !== null) return plan(seed);
     const startedAt = performance.now();
     do {
-      const plan = planMaze(n, style, from, to, wanted, { giveUpWhenShort: true, shape });
-      if (!plan.short) return plan;
+      const tried = plan(randomSeed(), true);
+      if (!tried.short) return tried;
     } while (performance.now() - startedAt < PLAN_BUDGET_MS);
-    return planMaze(n, style, from, to, wanted, { shape });
+    return plan(randomSeed());
   }
 
   // How long Super fast takes to play a whole maze, after planning.
   const FAST_FORWARD_MS = 900;
 
-  async function animateMazeGrowth() {
+  // Grows a new maze from a fresh seed, or from `seed` when rebuilding a maze
+  // code. (A button's click hands over its event, which is not a seed.)
+  async function animateMazeGrowth(seed) {
+    seed = Number.isInteger(seed) ? seed : null;
     exitUserSolveMode(false);
     cancelAnimation();
 
@@ -1322,7 +1541,9 @@
     setInteractiveDisabled(true);
 
     // S and E stay where the child put them; the maze grows around them.
-    const plan = planLongMaze(size, mazeStyle(), start, end);
+    const style = mazeStyle();
+    const plan = planLongMaze(size, style, start, end, seed);
+    setGrownMaze({ seed: plan.seed, size, style, shape: shapeId, start: { ...start }, end: { ...end } });
 
     // Every edge starts as a wall; the generator knocks out one edge per
     // step until each square is joined to the rest.
@@ -2914,6 +3135,11 @@
   buttons.end.addEventListener('click', () => setMode('end'));
 
   document.getElementById('generateBtn').addEventListener('click', animateMazeGrowth);
+  codeForm.addEventListener('submit', e => {
+    e.preventDefault();
+    growFromCode(codeInput.value);
+  });
+  codeInput.addEventListener('input', () => showCodeNote(CODE_NOTE));
   document.getElementById('animateBtn').addEventListener('click', animatePathDiscovery);
   document.getElementById('instantBtn').addEventListener('click', solveInstantly);
 
@@ -3035,15 +3261,21 @@
   }
 
   // The maze as the printed page shows it: walls, S, E and the route (gold
-  // unless a child picked another colour) on white, with no search colours. Drawn synchronously so the share sheet
-  // still opens from the tap.
+  // unless a child picked another colour) on white, with no search colours,
+  // and the maze code small underneath. Drawn synchronously so the share
+  // sheet still opens from the tap.
   function mazePicture() {
     const cell = 64;
     const border = Math.round(cell * 0.18);
     const inset = cell + border;
     const side = size * cell;
     const canvas = document.createElement('canvas');
-    canvas.width = canvas.height = side + 2 * inset;
+    canvas.width = side + 2 * inset;
+    // The code's type is sized from the whole picture, so it prints at about
+    // the same small size whatever the grid.
+    const code = printCode.textContent;
+    const codeFont = Math.round(canvas.width * 0.016);
+    canvas.height = canvas.width + (code ? Math.round(codeFont * 1.5) : 0);
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#fff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -3113,6 +3345,14 @@
     } else {
       ctx.lineCap = 'butt';
       ctx.strokeRect(-border / 2, -border / 2, side + border, side + border);
+    }
+
+    if (code) {
+      ctx.fillStyle = '#6e6e73';
+      ctx.font = `${codeFont}px ui-monospace, "SF Mono", Menlo, monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(code, side / 2, side + border + (canvas.height - inset - side - border) / 2);
     }
 
     const bytes = atob(canvas.toDataURL('image/png').split(',')[1]);

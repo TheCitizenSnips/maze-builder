@@ -153,6 +153,21 @@
               <p class="dial-note">Changes apply the next time you grow a maze.</p>
             </div>
           </details>
+
+          <!-- The code of the maze on screen. Typing one in grows that maze
+               again: the same size, style, shape, S, F and walls. -->
+          <details id="codeDetails" class="style-details code-details">
+            <summary class="row-control">
+              <span>Maze code</span>
+              <span class="style-summary"><span id="codeLabel" class="code-label">None</span><svg class="chevron" viewBox="0 0 12 12" aria-hidden="true"><path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            </summary>
+
+            <form id="codeForm" class="code-form">
+              <input id="codeInput" class="code-input" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" placeholder="K7M2QX-hard" aria-label="Maze code">
+              <button id="codeBuildBtn" class="code-build" type="submit">Grow</button>
+            </form>
+            <p id="codeNote" class="dial-note code-note" aria-live="polite">Every grown maze has a code. Type one in to grow that maze again.</p>
+          </details>
         </section>
 
         <section class="group-card card-animate">
@@ -302,6 +317,9 @@
           </div>
           </div>
 
+          <!-- Printed pages only: the code that grows this maze again. -->
+          <p id="printCode" class="print-code"></p>
+
           <!-- Under the maze: what a finger on the maze does, then zoom. -->
           <div class="maze-tools">
             <div class="segmented edit-tools" role="group" aria-label="Editing mode">
@@ -436,6 +454,9 @@
           <li><strong>Checked before you see it.</strong> The computer builds the whole maze in secret first. Then it measures the way from S to F. If the trip is too short, it throws that maze away and tries again. What you watch is a replay of a maze that passed the test.</li>
           <li><strong>S and F stay apart.</strong> If S and F are next to each other, the wall between them is never knocked down. So you always have to go the long way round.</li>
         </ul>
+
+        <h3>Maze codes</h3>
+        <p>When the spark picks a square “by chance”, the chances all come from one secret number, called the <strong>seed</strong>. The same seed always makes the same choices, so it grows the same maze. Every maze has a code under <strong>Maze code</strong>: the seed, then the size, style, shape and where S and F are. Type a code in, tap Grow, and the very same maze grows again. Codes are printed under the maze, too.</p>
 
         <h3>Easy, Medium and Hard</h3>
         <p>Each level picks a size and sets three dials. You can move the dials yourself under <strong>Maze style</strong>.</p>

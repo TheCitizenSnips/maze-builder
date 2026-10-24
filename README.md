@@ -76,6 +76,27 @@ piece; the outline is the outside wall, and growing, searching, solving and
 drawing walls all stay inside it. Start and Finish begin far apart inside the
 shape and can still be moved.
 
+## Maze codes
+
+Every grown maze has a code, shown under **Maze code** in the Maze card and
+printed small under the maze. Typing a code in and tapping **Grow** grows that
+exact maze again, on any device: the same size, Maze style, shape, Start,
+Finish and walls. The code is the maze's seed (six letters and digits, the
+number behind every chance the generator takes) followed by its settings:
+
+```text
+K7M2QX-hard                     a level
+K7M2QX-25-213-heart             size, then the Twisty, Shortcuts and Branches dials, then the shape
+K7M2QX-medium-s3.4-f15.12       S and F (row.column), only when moved
+```
+
+A seed on its own (`K7M2QX`) grows that seed on the maze as it is set up now.
+Case does not matter, and O, I and L read as 0, 1 and 1. Drawing a wall or
+moving S or F after growing makes a maze the code would not rebuild, so the
+code goes away until the next grow. `tests/maze-code.spec.js` pins a few codes
+to their mazes, so a change that would make old printed codes grow different
+mazes shows up as a failing test.
+
 ## Kid Mode (for little kids)
 
 A picture-only way to play for children who cannot read yet. Tap the
