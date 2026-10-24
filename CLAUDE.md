@@ -447,6 +447,12 @@ A maze can fill a picture instead of the whole square (Shape tiles in the Maze c
 
 Growing a maze keeps Start and Finish wherever they are; only changing the size puts them back in the corners. The whole maze is planned before the animation plays, so the planner can check the S-to-F route: it never opens the wall between side-by-side S and F, shortcuts that would cut the route below half a typical corner-to-corner route for the level are skipped, and a plan whose corridors join S and F too soon is replaced. Keep algorithm logic in the planner and visuals in the playback.
 
+### Seeds and maze codes
+
+Every chance the planner takes comes from a seeded random source (`seededRandom`), never `Math.random`, so a seed plus the settings the planner reads always plans the same maze. Grow tries fresh seeds until one passes the route check and keeps the seed that passed; `typicalCornerRoute` seeds its samples from the setting itself so the route limit is the same everywhere.
+
+The maze code (`formatMazeCode` / `readMazeCode`) packs version, seed, size, the three dials, shape and, when moved, S and F into Crockford base-32 characters plus a check character: `K7M2Q-X3PAB`, or `K7M2Q-X3PAB-4FQ2Z` with S and F. `CODE_SIZES` and `CODE_SHAPES` are append-only (a new shape goes at the end of `CODE_SHAPES`, or it gets no code); changing what a code means bumps `CODE_VERSION`. The code shows under Maze code in the Maze card (with Copy and Paste), prints small under the maze (`#printCode` and the share-sheet picture), and goes away when the maze is edited by hand. Codes are letters, digits and dashes so a future share link can carry one as is; on iOS a link opens in Safari, not the installed app, which is why Paste exists. A code written on paper must keep growing the same maze: `tests/maze-code.spec.js` pins some codes to wall fingerprints. A change to the planner, the random source or a shape drawing that breaks them breaks old codes; only do that deliberately.
+
 Do not replace this with random wall placement.
 
 The important property is that generated mazes are real mazes, not arbitrary grids that may be nonsensical.
@@ -1015,6 +1021,7 @@ Printing should:
 - preserve walls clearly
 - preserve start and finish
 - preserve final shortest path when appropriate
+- show the maze code small under the maze, so the page can be grown again
 - fit sensibly on a page
 
 Avoid printing translucent UI panels or app chrome.
@@ -1269,7 +1276,7 @@ For any material JavaScript edit, run a syntax check if Node is available:
 node --check app.js
 ```
 
-Then run the Playwright suite (`npm test`, see README). It covers the core
+Then run the Playwright suite (`npm test`, see README). GitHub runs it too on every pull request (the Tests check, `.github/workflows/test.yml`). It covers the core
 scenarios in section 52 and fails on any console error. Add or update a test
 alongside any behaviour change.
 
@@ -1364,7 +1371,7 @@ Features that fit the product especially well include:
 - optimal-path replay after human completion
 - optional hints
 - “show me where I went wrong”
-- generation seeds so a maze can be replayed/shared
+- sharing a maze code as a link (the code is already built for it)
 - step-by-step algorithm teaching mode
 - sound/haptics where web-platform support makes sense
 - age-appropriate challenge modes
