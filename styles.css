@@ -23,6 +23,10 @@
   --frontier: #9cddff;
   --current: #4cb8ff;
   --solution: #ffd60a;
+  /* The search colours above can be picked by the child (tap the key); these
+     are the matching glows as r,g,b, set alongside them by app.js. */
+  --frontier-glow: 50,173,230;
+  --solution-glow: 255,214,10;
 
   --shadow: 0 8px 28px rgba(0,0,0,0.08);
 }
@@ -146,15 +150,47 @@ button { -webkit-tap-highlight-color: transparent; }
 .app-info-button:active svg { transform: scale(0.88); }
 .app-info-button[aria-expanded="true"] { color: var(--blue); }
 
-.app-info .status-chip {
+.app-info-panel {
   position: absolute;
   top: calc(100% + 4px);
   right: 0;
   z-index: 20;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
 }
 
-.status-chip[hidden] { display: none; }
+.app-info-panel[hidden] { display: none; }
+
+.app-info .status-chip { box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
+
+.reset-options-button {
+  appearance: none;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 0.5px solid var(--separator);
+  background: rgba(255,255,255,0.92);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  color: var(--blue);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.reset-options-button:active { transform: scale(0.97); }
+
+/* Second step: the same button, now red, does the reset. */
+.reset-options-button.confirming {
+  background: var(--red);
+  border-color: transparent;
+  color: #fff;
+}
 
 .release-label {
   display: inline-flex;
@@ -604,12 +640,120 @@ select:disabled {
   color: var(--secondary-label);
   font-size: 12px;
   font-weight: 600;
+  position: relative;
 }
 
-.legend span {
+.legend span,
+.legend-pick {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+}
+
+/* The three search colours are buttons: a quiet pill says they can be
+   tapped, and a larger invisible hit area keeps them finger-sized without
+   spreading the key out. */
+.legend-pick {
+  position: relative;
+  isolation: isolate;
+  appearance: none;
+  min-height: 40px;
+  margin: -10px -2px;
+  padding: 0 8px 0 4px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.legend-pick::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 7px 0;
+  border-radius: 999px;
+  background: rgba(120,120,128,0.10);
+  transition: background 120ms ease;
+}
+
+.legend-pick:active,
+.legend-pick[aria-expanded="true"] { color: var(--blue); }
+
+.legend-pick:active::before,
+.legend-pick[aria-expanded="true"]::before { background: rgba(0,122,255,0.14); }
+
+.trace-palette {
+  position: absolute;
+  z-index: 30;
+  top: 0;
+  left: 0;
+  padding: 10px 10px 8px;
+  border-radius: 18px;
+  background: rgba(255,255,255,0.96);
+  border: 0.5px solid var(--separator);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.16);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+}
+
+.trace-palette[hidden] { display: none; }
+
+.trace-palette-title {
+  margin: 0 4px 6px;
+  color: var(--secondary-label);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.trace-palette-swatches {
+  display: grid;
+  grid-template-columns: repeat(4, 44px);
+  gap: 4px;
+}
+
+.trace-swatch {
+  appearance: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.trace-swatch i {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--swatch);
+  box-shadow: inset 0 0 0 0.5px rgba(0,0,0,0.14);
+  display: grid;
+  place-items: center;
+  transition: transform 110ms ease;
+}
+
+.trace-swatch:active i { transform: scale(0.9); }
+
+/* The picked colour wears a ring and a tick, so it does not rely on the ring
+   colour alone. */
+.trace-swatch[aria-checked="true"] i {
+  box-shadow: inset 0 0 0 0.5px rgba(0,0,0,0.14), 0 0 0 2.5px #fff, 0 0 0 4.5px var(--blue);
+}
+
+.trace-swatch[aria-checked="true"] i::after {
+  content: "";
+  width: 12px;
+  height: 7px;
+  margin-top: -3px;
+  border: solid rgba(0,0,0,0.55);
+  border-width: 0 0 2.5px 2.5px;
+  transform: rotate(-45deg);
 }
 
 .swatch {
@@ -911,11 +1055,12 @@ select:disabled {
 @keyframes frontierArrival {
   0% {
     background: #fff;
-    box-shadow: inset 0 0 0 0 rgba(50,173,230,0);
+    box-shadow: inset 0 0 0 0 rgba(var(--frontier-glow),0);
   }
   55% {
     background: #bdeeff;
-    box-shadow: inset 0 0 6px 2px rgba(50,173,230,.55);
+    background: color-mix(in srgb, var(--frontier) 62%, #fff);
+    box-shadow: inset 0 0 6px 2px rgba(var(--frontier-glow),.55);
   }
   100% {
     background: var(--frontier);
@@ -925,7 +1070,7 @@ select:disabled {
 
 @keyframes frontierPulse {
   from { box-shadow: inset 0 0 0 1px rgba(255,255,255,.42); }
-  to { box-shadow: inset 0 0 0 2px rgba(255,255,255,.82), inset 0 0 8px rgba(50,173,230,.35); }
+  to { box-shadow: inset 0 0 0 2px rgba(255,255,255,.82), inset 0 0 8px rgba(var(--frontier-glow),.35); }
 }
 
 @keyframes currentPulse {
@@ -945,12 +1090,12 @@ select:disabled {
 
 @keyframes solutionHead {
   from {
-    box-shadow: 0 0 6px rgba(255,214,10,.45);
+    box-shadow: 0 0 6px rgba(var(--solution-glow),.45);
   }
   to {
     box-shadow:
-      0 0 12px 4px rgba(255,214,10,.68),
-      0 0 22px 8px rgba(255,159,10,.20);
+      0 0 12px 4px rgba(var(--solution-glow),.68),
+      0 0 22px 8px rgba(var(--solution-glow),.20);
   }
 }
 

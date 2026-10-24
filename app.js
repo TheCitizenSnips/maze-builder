@@ -45,6 +45,12 @@
   const offlineBadge = byId('offlineBadge');
   const offlineBadgeText = offlineBadge && offlineBadge.querySelector('span');
   const appInfoBtn = byId('appInfoBtn');
+  const appInfoPanel = byId('appInfoPanel');
+  const resetOptionsBtn = byId('resetOptionsBtn');
+  const legendPicks = [...document.querySelectorAll('.legend-pick')];
+  const tracePalette = byId('tracePalette');
+  const tracePaletteTitle = byId('tracePaletteTitle');
+  const tracePaletteSwatches = byId('tracePaletteSwatches');
 
   const metricProgress = byId('metricProgress');
   const metricExplored = byId('metricExplored');
@@ -164,12 +170,54 @@
     isValid: id => Shapes.has(id)
   };
 
+  // The search colours are the child's to pick. Each hue comes in the shade
+  // that fits each job: soft for explored squares, brighter for the wave,
+  // strongest for the kept route. So the route still stands out from the
+  // squares behind it even when both get the same hue. Walls, S and F keep
+  // their colours: they mean the same thing everywhere.
+  const TRACE_HUES = {
+    cyan:   { name: 'Sky',    soft: '#d9f4ff', mid: '#9cddff', deep: '#4cb8ff', glow: '50,173,230' },
+    blue:   { name: 'Blue',   soft: '#dcebff', mid: '#a9cbff', deep: '#4a9bff', glow: '0,122,255' },
+    indigo: { name: 'Indigo', soft: '#e3e2fb', mid: '#bab8f5', deep: '#7a78ee', glow: '88,86,214' },
+    purple: { name: 'Purple', soft: '#f0e1fa', mid: '#d8b0f1', deep: '#b45ee6', glow: '175,82,222' },
+    pink:   { name: 'Pink',   soft: '#ffe0ea', mid: '#ffb0c6', deep: '#ff5c8a', glow: '255,45,85' },
+    orange: { name: 'Orange', soft: '#ffe8cc', mid: '#ffc57a', deep: '#ff9f0a', glow: '255,149,0' },
+    gold:   { name: 'Gold',   soft: '#fff4c4', mid: '#ffe680', deep: '#ffd60a', glow: '255,214,10' },
+    green:  { name: 'Green',  soft: '#daf6e2', mid: '#a2e8b5', deep: '#34c759', glow: '52,199,89' }
+  };
+  const TRACES = {
+    frontier: { label: 'Frontier', hue: 'cyan',
+      vars: h => ({ '--frontier': h.mid, '--current': h.deep, '--frontier-glow': h.glow }), shade: h => h.mid },
+    visited: { label: 'Explored', hue: 'blue',
+      vars: h => ({ '--visited': h.soft }), shade: h => h.soft },
+    solution: { label: 'Shortest path', hue: 'gold',
+      vars: h => ({ '--solution': h.deep, '--solution-glow': h.glow }), shade: h => h.deep }
+  };
+
+  function applyTraceColour(trace) {
+    const vars = TRACES[trace].vars(TRACE_HUES[TRACES[trace].hue]);
+    for (const [name, value] of Object.entries(vars)) document.documentElement.style.setProperty(name, value);
+  }
+
+  // A stand-in control per trace, like the shape's, so the settings code
+  // remembers the picked hue by name.
+  const traceControl = trace => ({
+    get value() { return TRACES[trace].hue; },
+    set value(hue) { TRACES[trace].hue = hue; applyTraceColour(trace); },
+    isValid: hue => Object.hasOwn(TRACE_HUES, hue)
+  });
+
   // Settings a child picked last time (size, speed, shape and maze style) come back
   // on the next visit. Only the choices are remembered, never the maze itself.
   // Storage can be missing or blocked (private browsing), so every access is
   // guarded.
   const SETTINGS_KEY = 'mazeBuilder.settings';
-  const rememberedControls = { size: sizeSelect, speed: speedSelect, shape: shapeControl, ...dials };
+  const rememberedControls = {
+    size: sizeSelect, speed: speedSelect, shape: shapeControl, ...dials,
+    frontierColour: traceControl('frontier'),
+    exploredColour: traceControl('visited'),
+    shortestColour: traceControl('solution')
+  };
   // Build and Solve mode: the picture-only way to play for children who
   // cannot read yet. Off unless a grown-up turned it on.
   let simpleMode = false;
@@ -2763,18 +2811,93 @@
 
   speedSelect.addEventListener('change', saveSettings);
 
-  // The ⓘ in the top bar folds the offline state and release away; a tap
-  // shows them, and a tap anywhere else or Escape folds them again.
+  // The ⓘ in the top bar folds the offline state, release and reset away; a
+  // tap shows them, and a tap anywhere else or Escape folds them again.
   function setAppInfoOpen(open) {
-    offlineBadge.hidden = !open;
+    appInfoPanel.hidden = !open;
     appInfoBtn.setAttribute('aria-expanded', String(open));
+    if (!open) setResetConfirming(false);
   }
-  appInfoBtn.addEventListener('click', () => setAppInfoOpen(offlineBadge.hidden));
+  appInfoBtn.addEventListener('click', () => setAppInfoOpen(appInfoPanel.hidden));
   document.addEventListener('pointerdown', e => {
-    if (!offlineBadge.hidden && !e.target.closest('.app-info')) setAppInfoOpen(false);
+    if (!appInfoPanel.hidden && !e.target.closest('.app-info')) setAppInfoOpen(false);
+    if (!tracePalette.hidden && !e.target.closest('.trace-palette, .legend-pick')) closeTracePalette();
   });
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && !offlineBadge.hidden) setAppInfoOpen(false);
+    if (e.key !== 'Escape') return;
+    if (!appInfoPanel.hidden) setAppInfoOpen(false);
+    if (!tracePalette.hidden) closeTracePalette();
+  });
+
+  // Reset all options: the first tap asks, a second tap within a few seconds
+  // forgets every remembered choice and opens the app again as new.
+  let resetTimer = 0;
+  function setResetConfirming(on) {
+    clearTimeout(resetTimer);
+    resetOptionsBtn.classList.toggle('confirming', on);
+    resetOptionsBtn.textContent = on ? 'Tap again to reset' : 'Reset all options';
+    if (on) resetTimer = setTimeout(() => setResetConfirming(false), 4000);
+  }
+  resetOptionsBtn.addEventListener('click', () => {
+    if (!resetOptionsBtn.classList.contains('confirming')) {
+      setResetConfirming(true);
+      return;
+    }
+    try {
+      localStorage.removeItem(SETTINGS_KEY);
+    } catch (error) {
+      // Nothing was saved, so the reload below already starts from the defaults.
+    }
+    location.reload();
+  });
+
+  // The key under the numbers: a tap on a search colour opens a palette
+  // right under it. A pick changes the colour at once, even mid-search,
+  // since colours are only how the maze is drawn.
+  let paletteTrace = null;
+  function openTracePalette(btn) {
+    const trace = btn.dataset.trace;
+    paletteTrace = trace;
+    tracePaletteTitle.textContent = `${TRACES[trace].label} colour`;
+    tracePaletteSwatches.replaceChildren(...Object.entries(TRACE_HUES).map(([id, hue]) => {
+      const swatch = document.createElement('button');
+      swatch.className = 'trace-swatch';
+      swatch.dataset.hue = id;
+      swatch.setAttribute('role', 'radio');
+      swatch.setAttribute('aria-checked', String(id === TRACES[trace].hue));
+      swatch.setAttribute('aria-label', hue.name);
+      swatch.style.setProperty('--swatch', TRACES[trace].shade(hue));
+      swatch.append(document.createElement('i'));
+      return swatch;
+    }));
+    for (const pick of legendPicks) pick.setAttribute('aria-expanded', String(pick === btn));
+    tracePalette.hidden = false;
+    // Under the tapped colour, kept inside the key's width.
+    const room = tracePalette.parentElement.clientWidth - tracePalette.offsetWidth;
+    tracePalette.style.left = `${Math.max(0, Math.min(btn.offsetLeft, room))}px`;
+    tracePalette.style.top = `${btn.offsetTop + btn.offsetHeight + 8}px`;
+    tracePaletteSwatches.querySelector('[aria-checked="true"]').focus({ preventScroll: true });
+  }
+  function closeTracePalette() {
+    tracePalette.hidden = true;
+    paletteTrace = null;
+    for (const pick of legendPicks) pick.setAttribute('aria-expanded', 'false');
+  }
+  for (const pick of legendPicks) {
+    pick.addEventListener('click', () => {
+      if (paletteTrace === pick.dataset.trace) closeTracePalette();
+      else openTracePalette(pick);
+    });
+  }
+  tracePaletteSwatches.addEventListener('click', e => {
+    const swatch = e.target.closest('.trace-swatch');
+    if (!swatch || !paletteTrace) return;
+    TRACES[paletteTrace].hue = swatch.dataset.hue;
+    applyTraceColour(paletteTrace);
+    saveSettings();
+    const pick = legendPicks.find(p => p.dataset.trace === paletteTrace);
+    closeTracePalette();
+    pick.focus({ preventScroll: true });
   });
 
   for (const btn of levelButtons) {
@@ -2911,8 +3034,8 @@
     });
   }
 
-  // The maze as the printed page shows it: walls, S, E and the gold route on
-  // white, with no search colours. Drawn synchronously so the share sheet
+  // The maze as the printed page shows it: walls, S, E and the route (gold
+  // unless a child picked another colour) on white, with no search colours. Drawn synchronously so the share sheet
   // still opens from the tap.
   function mazePicture() {
     const cell = 64;
@@ -2931,7 +3054,7 @@
       for (let c = 0; c < size; c++) {
         const fill = isAt(start, r, c) ? '#e8f8ef'
           : isAt(end, r, c) ? '#ffecef'
-          : grid[r][c].solution ? '#ffd60a' : null;
+          : grid[r][c].solution ? TRACE_HUES[TRACES.solution.hue].deep : null;
         if (fill) {
           ctx.fillStyle = fill;
           ctx.fillRect(c * cell, r * cell, cell, cell);
