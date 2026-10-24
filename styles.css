@@ -118,6 +118,44 @@ button { -webkit-tap-highlight-color: transparent; }
 
 .status-chip.ready { color: #248a3d; }
 
+/* The offline state and release stay folded behind a quiet ⓘ; a tap opens
+   them in a small card under it. */
+.app-info { position: relative; flex: none; }
+
+.app-info-button {
+  appearance: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--secondary-label);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.app-info-button svg {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
+  transition: transform 110ms ease;
+}
+
+.app-info-button:active svg { transform: scale(0.88); }
+.app-info-button[aria-expanded="true"] { color: var(--blue); }
+
+.app-info .status-chip {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 20;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+}
+
+.status-chip[hidden] { display: none; }
+
 .release-label {
   display: inline-flex;
   white-space: nowrap;
@@ -606,14 +644,14 @@ select:disabled {
 }
 
 /* The window the maze sits in. Squares shrink to fit the card (--fit-cell)
-   so even 25 × 25 never needs sideways scrolling, and the window keeps that
+   so even 51 × 51 never needs sideways scrolling, and the window keeps that
    fitted size. Zooming (--zoom, set by app.js) makes the squares bigger
    inside it; the maze then scrolls within the window, never the page
    sideways. Hidden scrollbars keep the window the same size either way. */
 .maze-viewport {
   --zoom: 1;
   --fit-cell: min(5vw, 36px);
-  --fit-cell: max(10px, min(36px, (100cqw - 2 * var(--maze-border)) / var(--grid-size)));
+  --fit-cell: min(36px, (100cqw - 2 * var(--maze-border)) / var(--grid-size));
   height: calc(var(--fit-cell) * var(--grid-size) + 2 * var(--maze-border));
   overflow: hidden;
   overscroll-behavior: contain;
@@ -975,16 +1013,15 @@ select:disabled {
 
 @media (min-width: 981px) {
   /* Side-by-side layout: also keep the whole maze inside the screen height
-     so a Pencil solve on a landscape iPad never needs scrolling. */
+     so a Pencil solve on a landscape iPad never needs scrolling. Squares
+     only shrink below 16px for the height when the width needs it too;
+     zoom makes them bigger again. */
   .maze-viewport {
-    --fit-cell: max(16px, min(36px, (100cqw - 2 * var(--maze-border)) / var(--grid-size), (100dvh - 430px) / var(--grid-size)));
+    --fit-cell: max(min(16px, (100cqw - 2 * var(--maze-border)) / var(--grid-size)), min(36px, (100cqw - 2 * var(--maze-border)) / var(--grid-size), (100dvh - 430px) / var(--grid-size)));
   }
 }
 
 @media (max-width: 560px) {
-  .release-commit,
-  .release-time { display: none; }
-
   .status-text { min-height: calc(3em * 1.35); }
 
   /* On a phone the button gets its own full-width row under the title. */
@@ -1038,7 +1075,7 @@ select:disabled {
   .telemetry,
   .legend,
   #userSolveBtn,
-  #offlineBadge {
+  .app-info {
     display: none !important;
   }
 
@@ -2072,7 +2109,7 @@ html.info-open body { overflow: hidden; }
 
 .simple-mode .simple-mode-button,
 .simple-mode .brand-group > div,
-.simple-mode #offlineBadge,
+.simple-mode .app-info,
 .simple-mode .sidebar,
 .simple-mode .content-header,
 .simple-mode .telemetry,
@@ -2108,7 +2145,7 @@ html.info-open body { overflow: hidden; }
 /* Bigger squares for small fingers, and the whole maze plus the buttons
    kept on one screen so there is nothing to scroll. */
 .simple-mode .maze-viewport {
-  --fit-cell: max(12px, min(56px, (100cqw - 2 * var(--maze-border)) / var(--grid-size), (100dvh - 290px) / var(--grid-size)));
+  --fit-cell: max(min(12px, (100cqw - 2 * var(--maze-border)) / var(--grid-size)), min(56px, (100cqw - 2 * var(--maze-border)) / var(--grid-size), (100dvh - 290px) / var(--grid-size)));
 }
 
 .simple-mode .zoom-bar { display: none; }

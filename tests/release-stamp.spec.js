@@ -43,18 +43,32 @@ test.describe('Release stamp', () => {
     await expect(page.locator('.release-label')).toHaveCount(0);
   });
 
-  test('a stamped release shows its date and commit next to the offline state', async ({ page }, testInfo) => {
+  test('a stamped release shows its date and commit behind the info button', async ({ page }) => {
     serveStamped(page, { pageBuild: RELEASE, scriptBuild: () => RELEASE });
     await page.goto('./');
     await expect(page.locator('#maze .cell').first()).toBeVisible();
 
-    const label = page.locator('#offlineBadge .release-label');
-    await expect(label).toContainText('Oct 20');
-    await expect(page.locator('#offlineBadge')).toHaveAttribute('title', /^Version a1b2c3d, released /);
-    // A phone shows the date only, so the badge stays on one line.
-    const commit = page.locator('#offlineBadge .release-commit');
-    if (testInfo.project.name === 'iphone') await expect(commit).toBeHidden();
-    else await expect(commit).toHaveText('a1b2c3d');
+    // Folded away until a grown-up taps the ⓘ.
+    const badge = page.locator('#offlineBadge');
+    await expect(badge).toBeHidden();
+    await page.click('#appInfoBtn');
+    await expect(badge).toBeVisible();
+    await expect(page.locator('#appInfoBtn')).toHaveAttribute('aria-expanded', 'true');
+
+    await expect(badge.locator('.release-label')).toContainText('Oct 20');
+    await expect(badge).toHaveAttribute('title', /^Version a1b2c3d, released /);
+    await expect(badge.locator('.release-commit')).toHaveText('a1b2c3d');
+    const box = await badge.boundingBox();
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(page.viewportSize().width);
+
+    // A tap elsewhere folds it away again, and so does Escape.
+    await page.locator('.app-title').click();
+    await expect(badge).toBeHidden();
+    await page.click('#appInfoBtn');
+    await expect(badge).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(badge).toBeHidden();
   });
 
   test('a page and script from different releases reload once for matching copies', async ({ page }, testInfo) => {

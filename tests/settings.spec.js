@@ -22,17 +22,23 @@ test.describe('Remembered settings', () => {
     await expect(page.locator('#wallLayer line.on')).toHaveCount(0);
   });
 
-  test('a first visit or unreadable saved settings use the defaults', async ({ page }) => {
+  test('a first visit or unreadable saved settings use the defaults (Fast speed)', async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem('mazeBuilder.settings', '{not json'));
     await openApp(page, { speed: null });
     await expect(page.locator('#sizeSelect')).toHaveValue('15');
-    await expect(page.locator('#speedSelect option:checked')).toHaveText('Medium');
+    await expect(page.locator('#speedSelect option:checked')).toHaveText('Fast');
 
     await page.evaluate(() => localStorage.setItem('mazeBuilder.settings', JSON.stringify({ size: 99, speed: 'warp' })));
     await page.reload();
     await expect(page.locator('#maze .cell')).toHaveCount(15 * 15);
-    await expect(page.locator('#speedSelect option:checked')).toHaveText('Medium');
+    await expect(page.locator('#speedSelect option:checked')).toHaveText('Fast');
     expect(page.mazeErrors).toEqual([]);
+  });
+
+  test('a saved speed wins over the Fast default', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('mazeBuilder.settings', JSON.stringify({ speed: '38' })));
+    await openApp(page, { speed: null });
+    await expect(page.locator('#speedSelect option:checked')).toHaveText('Medium');
   });
 
   test('the app still works when storage is blocked', async ({ page }) => {
