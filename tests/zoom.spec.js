@@ -130,7 +130,7 @@ test.describe('Zoom and pan', () => {
       return maze.width <= view.width + 0.5 && maze.height <= view.height + 0.5;
     });
     expect(fits).toBe(true);
-    await expect(page.locator('.zoom-bar')).toBeHidden();
+    await expect(page.locator('.maze-tools')).toBeHidden();
   });
 
   test('Ctrl + scroll (a trackpad pinch) zooms on a computer', async ({ page }, testInfo) => {

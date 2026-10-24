@@ -148,8 +148,6 @@ button { -webkit-tap-highlight-color: transparent; }
 .sidebar {
   display: grid;
   gap: 14px;
-  position: sticky;
-  top: max(16px, env(safe-area-inset-top));
 }
 
 .group-card,
@@ -637,16 +635,21 @@ select:disabled {
   --cell-size: calc(var(--fit-cell) * var(--zoom));
 }
 
-/* Under the maze: a hint and the zoom buttons, kept quiet and small. */
-.zoom-bar {
+/* Under the maze, where the finger already is: what touching the maze does
+   (walls, or moving S or F), a hint, and the zoom buttons. On a phone the
+   editing tools take the first row and zoom wraps underneath. */
+.maze-tools {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 10px 12px;
   margin-top: 10px;
 }
 
+.edit-tools { flex: 0 1 300px; }
+
 .zoom-hint {
+  flex: 1 1 0;
   min-width: 0;
   color: var(--secondary-label);
   font-size: 13px;
@@ -655,6 +658,7 @@ select:disabled {
 .zoom-buttons {
   display: flex;
   flex: none;
+  margin-left: auto;
   padding: 2px;
   border-radius: 12px;
   background: rgba(118,118,128,0.12);
@@ -964,13 +968,24 @@ select:disabled {
   }
 }
 
-@media (max-width: 980px) {
-  .workspace { grid-template-columns: 1fr; }
-  .sidebar {
-    position: static;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+/* Stacked layouts (iPad portrait, iPhone). The sidebar's cards join the
+   page grid so each one can sit where it helps: the settings and buttons
+   above the maze, side by side and only as tall as their own contents
+   (a card that opens up never stretches its neighbours), and the
+   explainer card under the maze. */
+@media screen and (max-width: 980px) {
+  .workspace {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
   }
-  .info-card { grid-column: 1 / -1; }
+
+  .sidebar { display: contents; }
+
+  .card-maze { order: 1; }
+  .card-animate { order: 2; }
+  .card-utilities { order: 3; }
+  .content-panel { order: 4; grid-column: 1 / -1; }
+  .info-card { order: 5; grid-column: 1 / -1; }
 }
 
 @media (min-width: 981px) {
@@ -978,6 +993,16 @@ select:disabled {
      so a Pencil solve on a landscape iPad never needs scrolling. */
   .maze-viewport {
     --fit-cell: max(16px, min(36px, (100cqw - 2 * var(--maze-border)) / var(--grid-size), (100dvh - 430px) / var(--grid-size)));
+  }
+}
+
+/* The controls column is the taller one, so the maze panel stays on screen
+   while it scrolls: open the shape pictures or move a dial and the maze is
+   still right there. Only where the whole panel fits the screen height. */
+@media screen and (min-width: 981px) and (min-height: 760px) {
+  .content-panel {
+    position: sticky;
+    top: max(16px, env(safe-area-inset-top));
   }
 }
 
@@ -1009,7 +1034,12 @@ select:disabled {
   .app-title { font-size: 26px; }
   .app-subtitle { display: none; }
 
-  .sidebar { grid-template-columns: 1fr; }
+  /* One column: set up the maze, grow it, then the maze itself, with the
+     occasional tools and the explainer below it. */
+  .workspace { grid-template-columns: minmax(0, 1fr); }
+  .card-utilities { order: 4; }
+  .content-panel { order: 3; }
+  .edit-tools { flex-basis: 100%; }
 
   .content-panel {
     border-radius: 22px;
@@ -1079,7 +1109,7 @@ select:disabled {
     overflow: visible;
   }
 
-  .zoom-bar { display: none !important; }
+  .maze-tools { display: none !important; }
 
   .wall-layer {
     print-color-adjust: exact;
@@ -2111,7 +2141,7 @@ html.info-open body { overflow: hidden; }
   --fit-cell: max(12px, min(56px, (100cqw - 2 * var(--maze-border)) / var(--grid-size), (100dvh - 290px) / var(--grid-size)));
 }
 
-.simple-mode .zoom-bar { display: none; }
+.simple-mode .maze-tools { display: none; }
 
 /* Back to the whole maze: only there while zoomed in. */
 .simple-action.fit {
