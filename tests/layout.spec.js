@@ -125,6 +125,19 @@ test.describe('Layout', () => {
     if (testInfo.project.name === 'iphone') expect(order[1]).toBeLessThan(order[2]);
   });
 
+  test('side by side, the maze panel stays on screen only while all of it fits', async ({ page }, testInfo) => {
+    test.skip(page.viewportSize().width <= 980, 'Only the wide layout places the maze beside the controls');
+    await openApp(page);
+    const sticky = () => page.locator('#contentPanel').evaluate(el => getComputedStyle(el).position === 'sticky');
+    await setSize(page, 15);
+    await expect.poll(sticky).toBe(true);
+    // A 51 × 51 maze makes the panel taller than the screen; then it scrolls
+    // with the page so the bottom row and the tools under it stay reachable.
+    await page.setViewportSize({ width: 1280, height: 700 });
+    await setSize(page, 51);
+    await expect.poll(sticky).toBe(false);
+  });
+
   test('controls are comfortable touch targets', async ({ page }) => {
     await openApp(page);
     const small = await page.evaluate(() =>

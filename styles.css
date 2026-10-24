@@ -1038,9 +1038,10 @@ select:disabled {
 
 /* The controls column is the taller one, so the maze panel stays on screen
    while it scrolls: open the shape pictures or move a dial and the maze is
-   still right there. Only where the whole panel fits the screen height. */
-@media screen and (min-width: 981px) and (min-height: 760px) {
-  .content-panel {
+   still right there. Only while the whole panel fits the screen height
+   (app.js sets .fits-screen), so a big grid's bottom row stays reachable. */
+@media screen and (min-width: 981px) {
+  .content-panel.fits-screen {
     position: sticky;
     top: max(16px, env(safe-area-inset-top));
   }
