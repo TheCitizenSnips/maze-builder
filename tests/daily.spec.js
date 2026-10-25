@@ -78,6 +78,16 @@ test.describe("Today's maze", () => {
     expect(page.mazeErrors).toEqual([]);
   });
 
+  test('new shapes join the daily mazes from 1 November', async ({ page }) => {
+    // 5 November's first hash lands on the donut once the pool holds all 24
+    // shapes; before then the same hash would only reach the first 20.
+    await page.clock.setFixedTime(at('2026-11-05'));
+    await openApp(page, { speed: 'Super fast' });
+    await growToday(page);
+    await expect(page.locator('#shapeLabel')).toHaveText('Donut');
+    expect(page.mazeErrors).toEqual([]);
+  });
+
   test("solving today's maze marks it solved, until tomorrow", async ({ page }, testInfo) => {
     await page.clock.setFixedTime(at('2026-10-25'));
     await openApp(page, { speed: 'Super fast' });
