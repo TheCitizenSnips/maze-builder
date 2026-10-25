@@ -90,7 +90,8 @@ like `https://thecitizensnips.github.io/maze-builder/#maze=K7M2Q-X3PAB`.
 Opening it grows the same maze, with no server involved: the code sits after
 `#`, which never leaves the device. On iOS a tapped link opens in Safari, not
 the Home Screen app, so to play a shared maze in the installed app, copy the
-link (or the code in the message) and tap Paste there.
+link (or the code in the message) and tap Paste there. A whole link or
+message typed or pasted into the code box shrinks to just its code.
 
 A code is ten letters and digits, or fifteen when S or F was moved:
 

@@ -1256,7 +1256,7 @@
   // grows the maze from its seed.
   function growFromCode(text) {
     if (running) return;
-    const read = readMazeCode(text);
+    const read = readMazeCode(findMazeCode(text));
     if (read.error) {
       showCodeNote(read.error, true);
       setStatus(read.error, 'Ready');
@@ -3242,7 +3242,13 @@
     e.preventDefault();
     growFromCode(codeInput.value);
   });
-  codeInput.addEventListener('input', () => showCodeNote(CODE_NOTE));
+  // A whole link or message pasted into the box shrinks to just its code.
+  codeInput.addEventListener('input', () => {
+    showCodeNote(CODE_NOTE);
+    const text = codeInput.value.trim();
+    const code = findMazeCode(text);
+    if (code !== text && readMazeCode(code).maze) codeInput.value = code;
+  });
   codePasteBtn.addEventListener('click', pasteMazeCode);
   codeCopyBtn.addEventListener('click', copyMazeCode);
   codeShareBtn.addEventListener('click', shareMazeLink);

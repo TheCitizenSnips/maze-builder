@@ -109,6 +109,29 @@ test.describe('Share links', () => {
     expect(page.mazeErrors).toEqual([]);
   });
 
+  test('a whole link typed or pasted into the code box shrinks to its code', async ({ page }) => {
+    await openApp(page, { size: 15, speed: 'Super fast' });
+    const first = await growMaze(page);
+    const code = await page.locator('#codeInput').inputValue();
+    await page.click('#blankBtn');
+    await openCode(page);
+
+    const link = `https://thecitizensnips.github.io/maze-builder/#maze=${code}`;
+    for (const pasted of [link, `Can you solve this maze? Maze code ${code} ${link}`, `${link.replace('#', '?fresh=1#')}&x=1`]) {
+      await page.fill('#codeInput', pasted);
+      await expect(page.locator('#codeInput')).toHaveValue(code);
+    }
+    // Typing a code by hand is left alone as it grows.
+    await page.fill('#codeInput', code.slice(0, 7).toLowerCase());
+    await expect(page.locator('#codeInput')).toHaveValue(code.slice(0, 7).toLowerCase());
+
+    await page.fill('#codeInput', link);
+    await page.click('#codeBuildBtn');
+    await waitForBuilt(page);
+    expect(walls(await readMaze(page))).toEqual(walls(first));
+    expect(page.mazeErrors).toEqual([]);
+  });
+
   test('in Kid Mode a link grows its maze instead of a random one', async ({ page, context }) => {
     await catchShares(page);
     await openApp(page, { size: 15, speed: 'Super fast' });
