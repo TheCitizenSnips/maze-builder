@@ -315,7 +315,6 @@
   let userPath = [];
   let userPathSet = new Set();
   let userStartedAt = 0;
-  let userPausedElapsedMs = 0;
   let userTimerId = null;
   let userMoves = 0;
   let userBacktracks = 0;
@@ -2789,7 +2788,6 @@
     userBacktracks = 0;
     userSteps = [];
     userStartedAt = 0;
-    userPausedElapsedMs = 0;
     userPathOverlay.classList.remove('success');
     clearUserCellClasses();
     syncUserOverlay();
@@ -2806,9 +2804,11 @@
     }
   }
 
-  function startUserTimer(alreadyElapsedMs = 0) {
+  // The clock starts when the line leaves S and keeps running, lifted or
+  // not, until F, a fresh start or leaving solve mode stops it.
+  function startUserTimer(startedAt = performance.now()) {
     stopUserTimer();
-    userStartedAt = performance.now() - alreadyElapsedMs;
+    userStartedAt = startedAt;
 
     userTimerId = setInterval(() => {
       if (!userStartedAt || userCompleted) return;
@@ -2990,8 +2990,9 @@
 
   // One step of the attempt: which way the line moved (U, D, L or R; a
   // back-up is just the step back the way it came) and the timer's tenths
-  // of a second when it moved. A paused attempt's clock is stopped, so the
-  // times skip the pauses, the same as the timer on screen.
+  // of a second when it moved, counted from the first touch on S. The clock
+  // runs on while the line is lifted, so the times include those gaps, the
+  // same as the timer on screen.
   function recordUserStep(from, to) {
     const way = to.r < from.r ? 'U' : to.r > from.r ? 'D' : to.c < from.c ? 'L' : 'R';
     const tenths = userStartedAt ? Math.round((performance.now() - userStartedAt) / 100) : 0;
@@ -3135,12 +3136,10 @@
     userTracing = false;
     userPointerId = null;
     userLastPoint = null;
-    stopUserTimer();
-    userPausedElapsedMs = performance.now() - userStartedAt;
-    updateUserMetrics(userPausedElapsedMs);
+    updateUserMetrics();
 
     syncSolveHints();
-    setStatus('Paused. Touch the end of your blue line to keep going.', 'Paused');
+    setStatus('Paused. Touch the end of your blue line to keep going. The clock is still running.', 'Paused');
   }
 
   // Resuming is forgiving: a touch on the end cell, or close to its centre,
@@ -3164,7 +3163,6 @@
     strokeUndo = () => restoreUserAttempt(before);
     captureUserPointer(e);
     userTracing = true;
-    startUserTimer(userPausedElapsedMs);
     traceUserPointTo(e.clientX, e.clientY);
     syncSolveHints();
 
@@ -3180,8 +3178,8 @@
       path: userPath.slice(),
       moves: userMoves,
       backtracks: userBacktracks,
-      steps: userSteps.length,
-      pausedMs: userPausedElapsedMs
+      steps: userSteps.slice(),
+      startedAt: userStartedAt
     };
   }
 
@@ -3192,7 +3190,6 @@
       setStatus('Start your line on S, then keep the Pencil or finger down as you trace.', 'Your Turn');
       return;
     }
-    stopUserTimer();
     userTracing = false;
     userPointerId = null;
     userLastPoint = null;
@@ -3200,12 +3197,13 @@
     userPathSet = new Set(userPath.map(p => cellId(p.r, p.c)));
     userMoves = before.moves;
     userBacktracks = before.backtracks;
-    userSteps.length = before.steps;
-    userPausedElapsedMs = before.pausedMs;
+    userSteps = before.steps;
+    // Touching S again restarted the clock; put the attempt's own back.
+    if (userStartedAt !== before.startedAt) startUserTimer(before.startedAt);
     markUserCoveredCells();
     syncUserOverlay();
-    updateUserMetrics(userPausedElapsedMs);
-    setStatus('Paused. Touch the end of your blue line to keep going.', 'Paused');
+    updateUserMetrics();
+    setStatus('Paused. Touch the end of your blue line to keep going. The clock is still running.', 'Paused');
   }
 
   function celebrationCopy(efficiency, elapsed) {
