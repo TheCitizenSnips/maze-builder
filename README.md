@@ -82,8 +82,16 @@ Every grown maze has a code, shown under **Maze code** in the Maze card and
 printed small under the maze. Typing or pasting a code and tapping **Grow**
 grows that exact maze again, on any device: the same size, Maze style, shape,
 Start, Finish and walls. **Copy code** puts the current code on the clipboard
-for a message; **Paste a code** grows the code in a pasted message straight
+for a message; **Paste** grows the code in a pasted message or link straight
 away (iOS asks first with its small Paste bubble).
+
+**Share link** opens the share sheet (Messages, Mail, AirDrop) with a link
+like `https://thecitizensnips.github.io/maze-builder/#maze=K7M2Q-X3PAB`.
+Opening it grows the same maze, with no server involved: the code sits after
+`#`, which never leaves the device. On iOS a tapped link opens in Safari, not
+the Home Screen app, so to play a shared maze in the installed app, copy the
+link (or the code in the message) and tap Paste there. A whole link or
+message typed or pasted into the code box shrinks to just its code.
 
 A code is ten letters and digits, or fifteen when S or F was moved:
 
