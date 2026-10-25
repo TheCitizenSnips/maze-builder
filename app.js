@@ -123,6 +123,19 @@
   const dailyBtn = byId('dailyBtn');
   const dailyBtnNote = byId('dailyBtnNote');
   const simpleDailyTile = byId('simpleDailyTile');
+  const successFavBtn = byId('successFavBtn');
+  const myMazesBtn = byId('myMazesBtn');
+  const myMazesSheet = byId('myMazesSheet');
+  const myMazesTabs = [...document.querySelectorAll('#myMazesSheet [data-list]')];
+  const myMazesList = byId('myMazesList');
+  const myMazesEmpty = byId('myMazesEmpty');
+  const myMazesNote = byId('myMazesNote');
+  const myMazesForgetBtn = byId('myMazesForgetBtn');
+  const simpleMazesBtn = byId('simpleMazesBtn');
+  const simpleMazesSheet = byId('simpleMazesSheet');
+  const simpleBestRow = byId('simpleBestRow');
+  const simpleAgainRow = byId('simpleAgainRow');
+  const simpleFavouriteRow = byId('simpleFavouriteRow');
 
   const buttons = {
     draw: byId('drawBtn'),
@@ -306,6 +319,9 @@
   let userTimerId = null;
   let userMoves = 0;
   let userBacktracks = 0;
+  // Every step of the attempt in order, back-ups included, with when it
+  // happened, so a saved maze keeps how it was solved (see recordUserStep).
+  let userSteps = [];
   let userOptimalCells = null;
   let userCompleted = false;
   let userPointerId = null;
@@ -605,6 +621,7 @@
   }
 
   function openSimpleShapes() {
+    closeSimpleMazes();
     simpleShapeSheet.hidden = false;
     simpleShapeBtn.setAttribute('aria-expanded', 'true');
     const current = simpleShapePicker.querySelector('[aria-checked="true"]');
@@ -1261,6 +1278,7 @@
     codeCopyBtn.disabled = !code;
     codeShareBtn.disabled = !code;
     printCode.textContent = code ? `Maze code ${code}` : '';
+    syncSavedUI();
   }
 
   function showCodeNote(message, isError = false) {
@@ -1281,6 +1299,7 @@
       return;
     }
     const maze = read.maze;
+    countPlay(formatMazeCode(maze));
     for (const name of Object.keys(dials)) dials[name].value = String(maze.style[name]);
     if (maze.size !== size || maze.shape !== shapeId) {
       size = maze.size;
@@ -1524,6 +1543,371 @@
     growFromCode(code);
     const day = new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
     showCodeNote(`Today's maze for ${day}. Everyone who taps Today's Maze today gets this same one.`);
+  }
+
+  // My Mazes: every finished maze that has a code is kept on this device,
+  // with a small picture of the route drawn and every step of the attempt
+  // (back-ups and timing too, ready for a ghost replay of the run). The
+  // lists show the 10 best finishes, the 10 lowest scores to try again, and
+  // up to 10 favourites marked with the heart on the finish sheet.
+  //
+  // One entry per maze code, holding its best finish so far. Only entries
+  // that are on a list (or a favourite) are kept, so storage stays small.
+  // Reset all options leaves these alone; Forget my mazes clears them.
+  const SAVED_KEY = 'mazeBuilder.mazes';
+  const SAVED_LIST_SIZE = 10;
+  const THUMB_SIZE = 240;
+
+  function readSaved() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(SAVED_KEY));
+      if (saved && Array.isArray(saved.results) && Array.isArray(saved.favourites)) return saved;
+    } catch (error) {
+      // Unreadable: start a fresh list.
+    }
+    return { results: [], favourites: [] };
+  }
+
+  // Best first: the highest score, then the quickest.
+  const byBest = (a, b) => b.efficiency - a.efficiency || a.ms - b.ms;
+
+  function bestMazes(saved) {
+    return saved.results.slice().sort(byBest).slice(0, SAVED_LIST_SIZE);
+  }
+
+  // The lowest scores, lowest first. A perfect route has nothing to beat,
+  // so it never goes on this list.
+  function tryAgainMazes(saved) {
+    return saved.results.filter(result => result.efficiency < 100)
+      .sort((a, b) => byBest(b, a)).slice(0, SAVED_LIST_SIZE);
+  }
+
+  function favouriteMazes(saved) {
+    const results = new Map(saved.results.map(result => [result.code, result]));
+    return saved.favourites.map(fav => ({ ...results.get(fav.code), ...fav }));
+  }
+
+  function writeSaved(saved) {
+    const keep = new Set([
+      ...bestMazes(saved).map(result => result.code),
+      ...tryAgainMazes(saved).map(result => result.code),
+      ...saved.favourites.map(fav => fav.code)
+    ]);
+    saved.results = saved.results.filter(result => keep.has(result.code));
+    try {
+      localStorage.setItem(SAVED_KEY, JSON.stringify(saved));
+    } catch (error) {
+      // Storage is full or off; the lists just do not change this time.
+    }
+    syncSavedUI();
+  }
+
+  // A small picture of the maze with the player's line on it: walls, the
+  // shape's outline, S and F, and the route from S to where it ended.
+  function savedMazePicture(route) {
+    const cell = THUMB_SIZE / (size + 1);
+    const inset = cell / 2;
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = THUMB_SIZE;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, THUMB_SIZE, THUMB_SIZE);
+    ctx.translate(inset, inset);
+
+    for (const [spot, fill] of [[start, '#30d158'], [end, '#ff453a']]) {
+      ctx.fillStyle = fill;
+      ctx.fillRect(spot.c * cell, spot.r * cell, cell, cell);
+    }
+
+    const wallLines = new Path2D();
+    for (let r = 0; r < size; r++) {
+      for (let c = 0; c < size; c++) {
+        for (const side of ['right', 'bottom']) {
+          const edge = { side, r, c };
+          if ((side === 'right' ? c === size - 1 : r === size - 1) || isFixedEdge(edge) || !hasWall(edge)) continue;
+          const x = side === 'right' ? c + 1 : c;
+          const y = side === 'right' ? r : r + 1;
+          wallLines.moveTo(x * cell, y * cell);
+          wallLines.lineTo((side === 'right' ? x : x + 1) * cell, (side === 'right' ? y + 1 : y) * cell);
+        }
+      }
+    }
+    ctx.strokeStyle = '#1c2b4f';
+    ctx.lineCap = 'square';
+    ctx.lineWidth = Math.max(1, cell * 0.14);
+    ctx.stroke(wallLines);
+
+    ctx.lineWidth = Math.max(2, cell * 0.28);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    if (isShaped()) ctx.stroke(new Path2D(shapeOutlinePath(cell)));
+    else ctx.strokeRect(0, 0, size * cell, size * cell);
+
+    if (route.length > 1) {
+      ctx.beginPath();
+      route.forEach((p, i) => ctx[i ? 'lineTo' : 'moveTo']((p.c + 0.5) * cell, (p.r + 0.5) * cell));
+      ctx.strokeStyle = '#007aff';
+      ctx.lineWidth = Math.max(2, cell * 0.45);
+      ctx.stroke();
+    }
+    return canvas.toDataURL('image/png');
+  }
+
+  // Called when a player reaches F. Keeps this finish if the maze is new to
+  // the lists or this beats its best.
+  function rememberSolve(efficiency, elapsedSeconds) {
+    const code = grownMaze && formatMazeCode(grownMaze);
+    if (!code) return;
+    const saved = readSaved();
+    const ms = Math.round(elapsedSeconds * 1000);
+    const before = saved.results.find(result => result.code === code);
+    if (before && byBest({ efficiency, ms }, before) >= 0) return;
+    const result = {
+      code,
+      shape: shapeId,
+      size,
+      efficiency,
+      ms,
+      cells: userMoves,
+      shortest: userOptimalCells,
+      backtracks: userBacktracks,
+      // The whole attempt: one letter per step (U, D, L, R) and the timer's
+      // tenths of a second at each step. Enough to replay the run exactly.
+      ways: userSteps.map(step => step[0]).join(''),
+      times: userSteps.map(step => step[1]),
+      at: Date.now(),
+      picture: savedMazePicture(userPath)
+    };
+    saved.results = saved.results.filter(other => other.code !== code).concat(result);
+    writeSaved(saved);
+  }
+
+  // Favourites keep at most 10. Each one counts how often it is played, so
+  // a new favourite takes the place of the one played least (the one played
+  // longest ago when that is a tie). Returns the favourite that made room.
+  function toggleFavourite(code) {
+    const saved = readSaved();
+    const at = saved.favourites.findIndex(fav => fav.code === code);
+    let replaced = null;
+    if (at >= 0) {
+      saved.favourites.splice(at, 1);
+    } else {
+      if (saved.favourites.length >= SAVED_LIST_SIZE) {
+        replaced = saved.favourites.slice().sort((a, b) => a.plays - b.plays || a.played - b.played)[0];
+        saved.favourites = saved.favourites.filter(fav => fav !== replaced);
+      }
+      saved.favourites.push({ code, plays: 1, played: Date.now() });
+    }
+    writeSaved(saved);
+    return replaced;
+  }
+
+  function isFavourite(code) {
+    return Boolean(code) && readSaved().favourites.some(fav => fav.code === code);
+  }
+
+  // A favourite is played each time its maze is grown again or drawn again
+  // with Try again.
+  function countPlay(code) {
+    const saved = readSaved();
+    const fav = saved.favourites.find(f => f.code === code);
+    if (!fav) return;
+    fav.plays++;
+    fav.played = Date.now();
+    writeSaved(saved);
+  }
+
+  function forgetSavedMazes() {
+    try {
+      localStorage.removeItem(SAVED_KEY);
+    } catch (error) {
+      // Nothing to forget.
+    }
+    syncSavedUI();
+  }
+
+  const savedTime = ms => ms < 60000
+    ? `${(ms / 1000).toFixed(1)}s`
+    : `${Math.floor(ms / 60000)}m ${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}s`;
+
+  function savedDay(at) {
+    const then = new Date(at);
+    const days = Math.round((new Date(dayKey()) - new Date(dayKey(then))) / 86400000);
+    if (days <= 0) return 'Today';
+    if (days === 1) return 'Yesterday';
+    if (days < 7) return then.toLocaleDateString(undefined, { weekday: 'long' });
+    return then.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  }
+
+  function starsHtml(efficiency) {
+    const stars = starCount(efficiency);
+    return [0, 1, 2].map(i => `<svg class="${i < stars ? 'on' : ''}"><use href="#i-star"></use></svg>`).join('');
+  }
+
+  // Grows a saved maze again from its code, ready to draw.
+  function playSavedMaze(code) {
+    closeMyMazes();
+    closeSimpleMazes();
+    exitUserSolveMode(false);
+    cancelAnimation();
+    codeInput.value = code;
+    growFromCode(code);
+  }
+
+  const SAVED_LISTS = {
+    best: {
+      pick: bestMazes,
+      empty: 'Finish a maze and it shows up here.',
+      note: 'Your 10 best finishes: most stars first, then the quickest.'
+    },
+    again: {
+      pick: tryAgainMazes,
+      empty: 'Nothing to beat yet. Mazes you finish with less than three stars show up here.',
+      note: 'Your 10 lowest scores. Can you find a shorter way?'
+    },
+    favourites: {
+      pick: favouriteMazes,
+      empty: 'Tap the heart when you finish a maze to keep it here.',
+      note: 'Up to 10 favourites. A new one takes the place of the one played least.'
+    }
+  };
+  let savedListShown = 'best';
+
+  function savedRow(item, index) {
+    const li = document.createElement('li');
+    li.className = 'saved-row';
+    const open = document.createElement('button');
+    open.type = 'button';
+    open.className = 'saved-open';
+    const label = item.shape ? Shapes.label(item.shape) : item.code;
+    const grid = item.size ? `${item.size} × ${item.size}` : '';
+    const known = Number.isFinite(item.efficiency);
+    open.setAttribute('aria-label', known
+      ? `${label} ${grid}, ${item.efficiency}%, ${savedTime(item.ms)}. Play it again.`
+      : `${label} ${grid}. Play it again.`);
+    open.innerHTML = `
+      <span class="saved-rank">${index + 1}</span>
+      <span class="saved-picture">${item.picture ? `<img src="${item.picture}" alt="">` : ''}</span>
+      <span class="saved-text">
+        <b></b>
+        <small>${known ? `<span class="saved-stars">${starsHtml(item.efficiency)}</span>` : ''}</small>
+        <small class="saved-grid"></small>
+      </span>
+      ${known ? `<span class="saved-score"><b>${item.efficiency}%</b><small>${savedTime(item.ms)} · ${item.backtracks} back-up${item.backtracks === 1 ? '' : 's'}</small></span>` : ''}`;
+    open.querySelector('.saved-text b').textContent = label;
+    open.querySelector('.saved-grid').textContent = [grid, known ? savedDay(item.at) : 'Not finished yet'].filter(Boolean).join(' · ');
+    open.addEventListener('click', () => playSavedMaze(item.code));
+
+    const heart = document.createElement('button');
+    heart.type = 'button';
+    heart.className = 'saved-heart';
+    const fav = isFavourite(item.code);
+    heart.setAttribute('aria-pressed', String(fav));
+    heart.setAttribute('aria-label', fav ? 'Remove from favourites' : 'Add to favourites');
+    heart.innerHTML = '<svg><use href="#i-heart"></use></svg>';
+    heart.addEventListener('click', () => {
+      const replaced = toggleFavourite(item.code);
+      myMazesNote.textContent = replaced
+        ? 'Favourites were full, so the one played least made room.'
+        : SAVED_LISTS[savedListShown].note;
+    });
+
+    li.append(open, heart);
+    return li;
+  }
+
+  function renderMyMazes() {
+    const saved = readSaved();
+    const list = SAVED_LISTS[savedListShown];
+    const items = list.pick(saved);
+    for (const tab of myMazesTabs) {
+      const on = tab.dataset.list === savedListShown;
+      tab.classList.toggle('active', on);
+      tab.setAttribute('aria-pressed', String(on));
+    }
+    myMazesList.replaceChildren(...items.map(savedRow));
+    myMazesEmpty.hidden = items.length > 0;
+    myMazesEmpty.textContent = list.empty;
+    myMazesNote.textContent = list.note;
+    myMazesForgetBtn.disabled = !saved.results.length && !saved.favourites.length;
+  }
+
+  function openMyMazes() {
+    setForgetConfirming(false);
+    renderMyMazes();
+    if (typeof myMazesSheet.showModal === 'function') myMazesSheet.showModal();
+    else myMazesSheet.setAttribute('open', '');
+    document.documentElement.classList.add('info-open');
+    const body = myMazesSheet.querySelector('.info-sheet-body');
+    body.scrollTop = 0;
+    // Focus the list rather than Done, so a tap leaves no focus ring.
+    body.focus({ preventScroll: true });
+  }
+
+  function closeMyMazes() {
+    if (!myMazesSheet.open) return;
+    if (typeof myMazesSheet.close === 'function') myMazesSheet.close();
+    else myMazesSheet.removeAttribute('open');
+  }
+
+  // Forget my mazes: the first tap asks, a second tap within a few seconds
+  // clears every list. Not in Kid Mode, so a child cannot wipe them.
+  let forgetTimer = 0;
+  function setForgetConfirming(on) {
+    clearTimeout(forgetTimer);
+    myMazesForgetBtn.classList.toggle('confirming', on);
+    myMazesForgetBtn.textContent = on ? 'Tap again to forget them all' : 'Forget my mazes';
+    if (on) forgetTimer = setTimeout(() => setForgetConfirming(false), 4000);
+  }
+
+  // Kid Mode's sheet: rows of pictures, no words. A trophy row of the best,
+  // a try-again row and a heart row. One tap grows that maze.
+  function renderSimpleMazes() {
+    const saved = readSaved();
+    const rows = [
+      [simpleBestRow, bestMazes(saved)],
+      [simpleAgainRow, tryAgainMazes(saved)],
+      [simpleFavouriteRow, favouriteMazes(saved)]
+    ];
+    for (const [row, items] of rows) {
+      row.closest('.simple-mazes-group').hidden = !items.length;
+      row.replaceChildren(...items.map(item => {
+        const tile = document.createElement('button');
+        tile.type = 'button';
+        tile.className = 'simple-maze-tile';
+        tile.setAttribute('aria-label', item.shape ? Shapes.label(item.shape) : 'Maze');
+        tile.innerHTML = (item.picture ? `<img src="${item.picture}" alt="">` : '') +
+          (Number.isFinite(item.efficiency) ? `<span class="saved-stars">${starsHtml(item.efficiency)}</span>` : '');
+        tile.addEventListener('click', () => playSavedMaze(item.code));
+        return tile;
+      }));
+    }
+  }
+
+  function openSimpleMazes() {
+    closeSimpleShapes();
+    renderSimpleMazes();
+    simpleMazesSheet.hidden = false;
+    simpleMazesBtn.setAttribute('aria-expanded', 'true');
+  }
+
+  function closeSimpleMazes() {
+    simpleMazesSheet.hidden = true;
+    simpleMazesBtn.setAttribute('aria-expanded', 'false');
+  }
+
+  // The heart on the finish sheet, and the trophy button that only shows
+  // once there is something to look at.
+  function syncSavedUI() {
+    const saved = readSaved();
+    simpleMazesBtn.hidden = !saved.results.length && !saved.favourites.length;
+    const code = grownMaze && formatMazeCode(grownMaze);
+    successFavBtn.hidden = !code;
+    const fav = isFavourite(code);
+    successFavBtn.setAttribute('aria-pressed', String(fav));
+    successFavBtn.setAttribute('aria-label', fav ? 'Remove from favourites' : 'Add to favourites');
+    if (myMazesSheet.open) renderMyMazes();
+    if (!simpleMazesSheet.hidden) renderSimpleMazes();
   }
 
   // A grown maze is planned in full first, then the plan is played back as
@@ -2403,6 +2787,7 @@
     userPathSet = new Set();
     userMoves = 0;
     userBacktracks = 0;
+    userSteps = [];
     userStartedAt = 0;
     userPausedElapsedMs = 0;
     userPathOverlay.classList.remove('success');
@@ -2565,6 +2950,7 @@
       userPathSet.delete(cellId(removed.r, removed.c));
       userMoves++;
       userBacktracks++;
+      recordUserStep(removed, next);
 
       const removedEl = getCellElement(removed.r, removed.c);
       if (removedEl) {
@@ -2587,6 +2973,7 @@
     userPath.push(next);
     userPathSet.add(id);
     userMoves++;
+    recordUserStep(last, next);
 
     const el = getCellElement(next.r, next.c);
     if (el && !el.classList.contains('start') && !el.classList.contains('end')) {
@@ -2599,6 +2986,16 @@
     if (next.r === end.r && next.c === end.c) {
       completeUserSolve();
     }
+  }
+
+  // One step of the attempt: which way the line moved (U, D, L or R; a
+  // back-up is just the step back the way it came) and the timer's tenths
+  // of a second when it moved. A paused attempt's clock is stopped, so the
+  // times skip the pauses, the same as the timer on screen.
+  function recordUserStep(from, to) {
+    const way = to.r < from.r ? 'U' : to.r > from.r ? 'D' : to.c < from.c ? 'L' : 'R';
+    const tenths = userStartedAt ? Math.round((performance.now() - userStartedAt) / 100) : 0;
+    userSteps.push([way, tenths]);
   }
 
   // Move the route toward the cell under the pointer. A stroke that clips a
@@ -2783,6 +3180,7 @@
       path: userPath.slice(),
       moves: userMoves,
       backtracks: userBacktracks,
+      steps: userSteps.length,
       pausedMs: userPausedElapsedMs
     };
   }
@@ -2802,6 +3200,7 @@
     userPathSet = new Set(userPath.map(p => cellId(p.r, p.c)));
     userMoves = before.moves;
     userBacktracks = before.backtracks;
+    userSteps.length = before.steps;
     userPausedElapsedMs = before.pausedMs;
     markUserCoveredCells();
     syncUserOverlay();
@@ -2950,6 +3349,7 @@
     successEfficiency.textContent = `${efficiency}%`;
     fillSimpleResult(efficiency, elapsed);
     rememberDailyResult(efficiency).catch(() => {});
+    rememberSolve(efficiency, elapsed);
 
     createConfetti();
 
@@ -2990,19 +3390,52 @@
     }
   });
 
+  const playAgainCounts = () => countPlay(grownMaze && formatMazeCode(grownMaze));
+
   successAgainBtn.addEventListener('click', () => {
+    playAgainCounts();
     successSheet.hidden = true;
     resetUserAttempt();
     setStatus('Try again. Start on S and see if you can improve your route.', 'Your Turn');
   });
 
   successReplayBtn.addEventListener('click', () => {
+    playAgainCounts();
     successSheet.hidden = true;
     resetUserAttempt();
     setStatus('Try again. Start on S and see if you can improve your route.', 'Your Turn');
   });
 
   successNewMazeBtn.addEventListener('click', animateMazeGrowth);
+
+  // The heart keeps this maze in My Mazes' favourites (or lets it go).
+  successFavBtn.addEventListener('click', () => {
+    const code = grownMaze && formatMazeCode(grownMaze);
+    if (!code) return;
+    const replaced = toggleFavourite(code);
+    if (isFavourite(code)) {
+      setStatus(replaced
+        ? 'Saved to your favourites. You had 10, so the one played least made room.'
+        : 'Saved to your favourites in My Mazes.', 'Complete');
+    }
+  });
+
+  myMazesBtn.addEventListener('click', openMyMazes);
+  for (const tab of myMazesTabs) {
+    tab.addEventListener('click', () => {
+      savedListShown = tab.dataset.list;
+      setForgetConfirming(false);
+      renderMyMazes();
+    });
+  }
+  myMazesForgetBtn.addEventListener('click', () => {
+    if (!myMazesForgetBtn.classList.contains('confirming')) {
+      setForgetConfirming(true);
+      return;
+    }
+    setForgetConfirming(false);
+    forgetSavedMazes();
+  });
 
   // Done means finished with this maze for now: solving ends so the maze
   // can be edited. Try Again stays in Solve It Yourself.
@@ -3497,6 +3930,7 @@
 
   function exitSimpleMode() {
     closeSimpleShapes();
+    closeSimpleMazes();
     simpleMode = false;
     syncSimpleModeUI();
     saveSettings();
@@ -3536,8 +3970,14 @@
     else closeSimpleShapes();
   });
   simpleShapeSheet.querySelector('[data-close-shapes]').addEventListener('click', closeSimpleShapes);
+  simpleMazesBtn.addEventListener('click', () => {
+    if (simpleMazesSheet.hidden) openSimpleMazes();
+    else closeSimpleMazes();
+  });
+  simpleMazesSheet.querySelector('[data-close-mazes]').addEventListener('click', closeSimpleMazes);
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && !simpleShapeSheet.hidden) closeSimpleShapes();
+    if (e.key === 'Escape' && !simpleMazesSheet.hidden) closeSimpleMazes();
   });
   simpleSolveBtn.addEventListener('click', () => {
     if (running) return;
@@ -3726,6 +4166,7 @@
   buildShapePicker();
   buildSimpleShapePicker();
   syncDailyUI();
+  syncSavedUI();
   // Saved settings from before shapes had a smallest size.
   fitShapeToSize();
   syncShapeUI();

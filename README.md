@@ -123,6 +123,23 @@ picked for the day, and once grown it is an ordinary maze code to copy, share
 or print. Solving it marks the button **Solved** (a gold star in Kid Mode)
 until the day ends.
 
+## My Mazes
+
+Every finished maze that has a code is kept on the device. **My Mazes** (in
+Utilities) shows three lists of 10: **Best 10** (most stars, then the
+quickest), **Try Again** (the lowest scores, to beat) and **Favourites**
+(picked with the heart on the finish sheet). Each row has a small picture of
+the route that was drawn, the score, the time and the back-ups; a tap grows
+that maze again. Each maze keeps its best finish, along with every step of
+it and its timing, ready for a ghost replay later.
+
+Favourites hold 10. Each one counts how often it is played (grown again or
+drawn again with Try again), so an 11th takes the place of the one played
+least. In Kid Mode a gold trophy button (once something is saved) opens rows
+of pictures: a trophy row, a try-again row and a heart row. Reset all options
+leaves My Mazes alone; **Forget my mazes** at the bottom of the sheet clears
+them after a second tap.
+
 ## Kid Mode (for little kids)
 
 A picture-only way to play for children who cannot read yet. Tap the

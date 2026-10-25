@@ -2742,3 +2742,286 @@ html.info-open body { overflow: hidden; }
     display: none !important;
   }
 }
+
+/* My Mazes ---------------------------------------------------------------
+   The 10 best finishes, the 10 lowest scores and up to 10 favourites. A
+   sheet like the learn sheets in full mode; rows of pictures in Kid Mode. */
+.my-mazes-body { font-size: 15px; line-height: 1.35; }
+
+.my-mazes-tabs { margin-bottom: 6px; }
+
+.saved-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.saved-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-bottom: 0.5px solid var(--separator);
+}
+
+.saved-open {
+  appearance: none;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.saved-open:active { opacity: 0.6; }
+
+.saved-rank {
+  flex: none;
+  width: 20px;
+  color: var(--secondary-label);
+  font-weight: 650;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.saved-picture {
+  flex: none;
+  width: 60px;
+  height: 60px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 0 0 0.5px rgba(0,0,0,0.14);
+}
+
+.saved-picture img { display: block; width: 100%; height: 100%; }
+
+.saved-text { flex: 1; min-width: 0; }
+
+.saved-text b {
+  display: block;
+  font-size: 16px;
+  font-weight: 650;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.saved-text small {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+  color: var(--secondary-label);
+  font-size: 13px;
+}
+
+.saved-stars { display: inline-flex; gap: 1px; }
+.saved-stars svg { width: 14px; height: 14px; fill: rgba(118,118,128,0.25); }
+.saved-stars svg.on { fill: var(--gold, #ffd60a); }
+
+.saved-score {
+  flex: none;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.saved-score b { display: block; font-size: 16px; font-weight: 700; }
+.saved-score small { color: var(--secondary-label); font-size: 12px; }
+
+/* Hearts: hollow until a maze is a favourite, then filled pink. */
+.saved-heart,
+.success-fav {
+  appearance: none;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #ff2d55;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 140ms cubic-bezier(.2,.8,.2,1);
+}
+
+.saved-heart svg,
+.success-fav svg {
+  width: 24px;
+  height: 24px;
+  fill: transparent;
+  stroke: currentColor;
+  stroke-width: 2;
+  overflow: visible;
+}
+
+.saved-heart[aria-pressed="true"] svg,
+.success-fav[aria-pressed="true"] svg { fill: currentColor; }
+
+.saved-heart:active,
+.success-fav:active { transform: scale(0.88); }
+
+.success-fav[aria-pressed="true"] svg { animation: heartPop 360ms cubic-bezier(.2,.8,.2,1.4); }
+
+@keyframes heartPop {
+  50% { transform: scale(1.3); }
+}
+
+.success-fav {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  background: rgba(255,45,85,0.10);
+}
+
+.success-fav[hidden] { display: none; }
+
+.simple-mode .success-fav {
+  width: 60px;
+  height: 60px;
+}
+
+.simple-mode .success-fav svg { width: 32px; height: 32px; }
+
+.saved-empty {
+  margin: 18px 0 6px;
+  color: var(--secondary-label);
+  text-align: center;
+}
+
+.saved-empty[hidden] { display: none; }
+
+.saved-note { margin: 14px 0 4px; }
+
+.saved-forget {
+  appearance: none;
+  min-height: 44px;
+  margin-top: 4px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--red);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.saved-forget.confirming { background: var(--red); color: #fff; }
+.saved-forget:disabled { opacity: 0.35; cursor: default; }
+
+/* Kid Mode: a gold trophy button, and a sheet of picture rows. */
+.simple-action.mazes {
+  background: linear-gradient(145deg, #ffd60a, #ffb800);
+  box-shadow: 0 10px 24px rgba(255,184,0,0.3);
+}
+
+.simple-mazes-panel {
+  position: relative;
+  display: grid;
+  gap: 14px;
+  width: min(640px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 16px;
+  border-radius: 28px;
+  background: var(--surface-strong, #fff);
+  box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+  animation: shapeSheetIn 220ms cubic-bezier(.2,.8,.2,1) both;
+}
+
+.simple-mazes-group {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.simple-mazes-group[hidden] { display: none; }
+
+.simple-mazes-badge {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  color: #fff;
+}
+
+.simple-mazes-badge svg { width: 26px; height: 26px; fill: currentColor; }
+.best .simple-mazes-badge { background: linear-gradient(145deg, #ffd60a, #ffb800); }
+.again .simple-mazes-badge { background: #34c759; }
+.favourites .simple-mazes-badge { background: #ff2d55; }
+
+/* Ten pictures in a row that slides sideways. */
+.simple-mazes-row {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 112px;
+  gap: 10px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  padding: 4px 2px;
+}
+
+.simple-maze-tile {
+  appearance: none;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 8px 8px 6px;
+  border: 0;
+  border-radius: 18px;
+  background: rgba(118,118,128,0.08);
+  cursor: pointer;
+  scroll-snap-align: start;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 120ms ease;
+}
+
+.simple-maze-tile:active { transform: scale(0.95); }
+
+.simple-maze-tile img {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.simple-maze-tile .saved-stars svg { width: 20px; height: 20px; }
+
+@media (max-width: 720px) {
+  .simple-mazes-row { grid-auto-columns: 92px; }
+  .simple-mazes-badge { width: 40px; height: 40px; }
+  .saved-picture { width: 52px; height: 52px; }
+  .saved-rank { display: none; }
+}
+
+@media print {
+  .success-fav,
+  .simple-mazes-sheet { display: none !important; }
+}
+
+.saved-text small:empty { display: none; }
+.saved-text .saved-grid { margin-top: 2px; }
+
+/* Four round buttons (five while zoomed) across a phone, inside its edges. */
+@media (max-width: 720px) {
+  .simple-action { width: 68px; height: 68px; }
+  .simple-mode .simple-bar { gap: 16px; }
+  .simple-mode .simple-bar.zoomed .simple-action:not(.fit) { width: 62px; height: 62px; }
+}
