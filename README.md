@@ -109,6 +109,18 @@ a maze the code would not rebuild, so the code goes away until the next grow.
 `tests/maze-code.spec.js` pins a few codes to their mazes, so a change that
 would make old printed codes grow different mazes shows up as a failing test.
 
+## Today's maze
+
+**Today's Maze** (above Grow a Maze; in Kid Mode, the calendar tile at the top
+of the shape sheet) grows one maze a day that is the same for everyone, with
+no server. The day is the device's own date, so the maze changes at local
+midnight. The date goes through SHA-256 with a fixed salt to pick the shape
+and seed, so days next to each other give unrelated mazes and nobody can count
+up from today's code to tomorrow's. It is a 21 × 21 Hard maze in a shape
+picked for the day, and once grown it is an ordinary maze code to copy, share
+or print. Solving it marks the button **Solved** (a gold star in Kid Mode)
+until the day ends.
+
 ## Kid Mode (for little kids)
 
 A picture-only way to play for children who cannot read yet. Tap the

@@ -578,6 +578,26 @@ button { -webkit-tap-highlight-color: transparent; }
   color: var(--label);
 }
 
+/* Today's Maze, above Grow a Maze: calm like Pause, in blue, with the date (or "Solved")
+   in small grey after the name. */
+.ios-button.daily-button {
+  margin-bottom: 8px;
+  background: rgba(0,122,255,0.10);
+  color: var(--blue);
+}
+
+.daily-note {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--secondary-label);
+  font-variant-numeric: tabular-nums;
+}
+
+.daily-button.solved .daily-note {
+  color: #248a3d;
+  font-weight: 650;
+}
+
 .ios-button:active {
   transform: scale(0.985);
   filter: brightness(.95);
@@ -2345,6 +2365,7 @@ html.info-open body { overflow: hidden; }
     padding: 12px;
   }
   .simple-shape-tile { min-height: 0; border-radius: 16px; }
+  .simple-shape-picker { grid-template-columns: repeat(11, minmax(0, 1fr)); }
 }
 
 .simple-shape-picker {
@@ -2374,6 +2395,46 @@ html.info-open body { overflow: hidden; }
 }
 
 .simple-shape-tile svg { width: 100%; height: 100%; }
+
+/* Today's maze heads the shape sheet: a whole row with a calendar page
+   showing today's date, and a gold star once it is solved. */
+.simple-daily-tile {
+  appearance: none;
+  position: relative;
+  grid-column: 1 / -1;
+  display: grid;
+  place-items: center;
+  min-height: 84px;
+  padding: 8px;
+  border: 0;
+  border-radius: 20px;
+  background: rgba(0,122,255,0.10);
+  color: var(--wall);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 120ms ease;
+}
+
+.simple-daily-tile svg { width: 68px; height: 68px; }
+.simple-daily-tile:active { transform: scale(0.97); }
+
+.simple-daily-tile .daily-star {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  margin-left: 78px;
+  margin-top: -36px;
+  fill: #ffd60a;
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,0.25));
+}
+
+/* A short landscape phone: today's tile is one column down the side, beside
+   the two rows of shapes, instead of a row across the top. */
+@media (max-height: 600px) and (orientation: landscape) {
+  .simple-daily-tile { grid-column: auto; grid-row: span 2; min-height: 0; padding: 6px; border-radius: 16px; }
+  .simple-daily-tile svg { width: 100%; height: auto; }
+  .simple-daily-tile .daily-star { width: 24px; height: 24px; margin: 0; top: 4px; right: 4px; }
+}
 .simple-shape-tile:active { transform: scale(0.94); }
 
 .simple-shape-tile[aria-checked="true"] {
