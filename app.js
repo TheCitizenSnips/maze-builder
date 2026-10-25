@@ -120,6 +120,9 @@
   const simpleShapeIcon = byId('simpleShapeIcon');
   const simpleShapeSheet = byId('simpleShapeSheet');
   const simpleShapePicker = byId('simpleShapePicker');
+  const dailyBtn = byId('dailyBtn');
+  const dailyBtnNote = byId('dailyBtnNote');
+  const simpleDailyTile = byId('simpleDailyTile');
 
   const buttons = {
     draw: byId('drawBtn'),
@@ -467,6 +470,7 @@
     buttons.start.disabled = disabled;
     buttons.end.disabled = disabled;
     document.getElementById('generateBtn').disabled = disabled;
+    dailyBtn.disabled = disabled;
     codeBuildBtn.disabled = disabled;
     codePasteBtn.disabled = disabled;
     document.getElementById('animateBtn').disabled = disabled;
@@ -622,6 +626,7 @@
 
   function syncShapeUI() {
     for (const tile of [...shapePicker.children, ...simpleShapePicker.children]) {
+      if (!tile.dataset.shape) continue;
       tile.setAttribute('aria-checked', String(tile.dataset.shape === shapeId));
     }
     simpleShapeIcon.innerHTML = shapeSvg(shapeId, 'simple-icon');
@@ -1361,6 +1366,144 @@
     return true;
   }
 
+  // Today's maze: one maze a day, the same on every device, with no server.
+  //
+  // The day is the device's own calendar date, so the maze changes at local
+  // midnight; two people in different time zones can be a day apart for a
+  // few hours. The date is run through SHA-256 together with DAILY_SALT, a
+  // fixed string, and the maze's seed and shape come from the result. So
+  // tomorrow's maze cannot be worked out from today's code or by counting up
+  // from it: neighbouring days share nothing. (Anyone who reads this file
+  // can still compute any day's maze; without a server that cannot be
+  // helped.) Changing the salt, the size or the style changes every day's
+  // maze, which tests/daily.spec.js pins.
+  const DAILY_SALT = 'tLJ2worBeouclMoaO-BtM3KY';
+  const DAILY_SIZE = 15;
+  const DAILY_STYLE = { twisty: LEVELS.medium.twisty, shortcuts: LEVELS.medium.shortcuts, branches: LEVELS.medium.branches };
+  // Tries for a seed whose S-to-F route is long enough; every device tries
+  // the same seeds in the same order, so they all settle on the same one.
+  const DAILY_TRIES = 40;
+  // Which day's maze was last solved, and how well, on this device.
+  const DAILY_KEY = 'mazeBuilder.daily';
+
+  const dayKey = (date = new Date()) => [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0')
+  ].join('-');
+
+  async function dailyHash(day, attempt) {
+    const text = `maze-builder daily|${DAILY_SALT}|${day}|${attempt}`;
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+    return new DataView(digest);
+  }
+
+  // The maze for a day ('2026-10-25'): { seed, size, style, shape, start, end },
+  // the same thing a maze code holds. The shape comes from the first hash,
+  // then each try takes its seed from the next.
+  const dailyCache = new Map();
+  function dailyMaze(day) {
+    if (!dailyCache.has(day)) dailyCache.set(day, (async () => {
+      const first = await dailyHash(day, 0);
+      const shape = CODE_SHAPES[first.getUint32(4) % CODE_SHAPES.length];
+      const mazeShape = Shapes.mask(shape, DAILY_SIZE);
+      const ends = Shapes.ends(shape, DAILY_SIZE);
+      const wanted = Math.floor(typicalCornerRoute(DAILY_SIZE, DAILY_STYLE, shape) / 2);
+      let seed = 0;
+      for (let attempt = 0; attempt < DAILY_TRIES; attempt++) {
+        const hash = attempt ? await dailyHash(day, attempt) : first;
+        seed = hash.getUint32(0) % 2 ** SEED_BITS;
+        const plan = planMaze(DAILY_SIZE, DAILY_STYLE, ends.start, ends.end, wanted,
+          { giveUpWhenShort: true, shape: mazeShape, random: seededRandom(seed) });
+        if (!plan.short) break;
+      }
+      return { seed, size: DAILY_SIZE, style: DAILY_STYLE, shape, start: ends.start, end: ends.end };
+    })());
+    return dailyCache.get(day);
+  }
+
+  async function dailyCode(day = dayKey()) {
+    return formatMazeCode(await dailyMaze(day));
+  }
+
+  // True when the maze on screen is today's (grown from the button, a
+  // pasted code or a shared link alike).
+  async function isTodaysMaze() {
+    const code = grownMaze && formatMazeCode(grownMaze);
+    return Boolean(code) && code === await dailyCode();
+  }
+
+  function readDailyResult() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(DAILY_KEY));
+      return saved && saved.day === dayKey() ? saved : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  // Remembers the best result for today's maze on this device, for the
+  // mark on the Today's Maze buttons.
+  async function rememberDailyResult(efficiency) {
+    if (!(await isTodaysMaze())) return;
+    const best = Math.max(efficiency, (readDailyResult() || {}).efficiency || 0);
+    try {
+      localStorage.setItem(DAILY_KEY, JSON.stringify({ day: dayKey(), efficiency: best }));
+    } catch (error) {
+      // Not saved; the mark just does not show.
+    }
+    syncDailyUI();
+  }
+
+  // A calendar page with today's date on it, so a child who cannot read
+  // yet knows which tile is today's maze.
+  function calendarSvg(date) {
+    return `<svg viewBox="0 0 48 48" aria-hidden="true">
+      <rect x="5" y="8" width="38" height="36" rx="7" fill="#fff" stroke="currentColor" stroke-width="2.5"/>
+      <path d="M5 15a7 7 0 0 1 7-7h24a7 7 0 0 1 7 7v4H5z" fill="#ff453a"/>
+      <rect x="14" y="3" width="4" height="10" rx="2" fill="currentColor"/>
+      <rect x="30" y="3" width="4" height="10" rx="2" fill="currentColor"/>
+      <text x="24" y="38" text-anchor="middle" font-size="18" font-weight="700" fill="currentColor"
+        font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif">${date.getDate()}</text>
+    </svg>`;
+  }
+
+  // The buttons show today's date, and a star once today's maze is solved
+  // here. Called again on each grow, so an app left open overnight moves on
+  // to the new day.
+  function syncDailyUI() {
+    const now = new Date();
+    const solved = readDailyResult();
+    dailyBtn.classList.toggle('solved', Boolean(solved));
+    dailyBtnNote.textContent = solved ? 'Solved' : now.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+    dailyBtn.setAttribute('aria-label', solved ? "Today's maze, solved" : "Today's maze");
+    simpleDailyTile.classList.toggle('solved', Boolean(solved));
+    simpleDailyTile.innerHTML = calendarSvg(now) +
+      (solved ? '<svg class="daily-star" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-star"></use></svg>' : '');
+    simpleDailyTile.setAttribute('aria-label', solved ? "Today's maze, solved" : "Today's maze");
+  }
+
+  // Grows today's maze: it is a maze code like any other, so it gets a code,
+  // a share link and a printout too.
+  async function growDailyMaze() {
+    if (running) return;
+    const runBefore = runId;
+    let code = '';
+    try {
+      code = await dailyCode();
+    } catch (error) {
+      // SubtleCrypto needs a secure page (https, or localhost while testing).
+      setStatus("Today's maze needs the app's https address. Open it from the Home Screen or the usual link.", 'Ready');
+      return;
+    }
+    // Another grow started while the hash was being worked out.
+    if (running || runId !== runBefore) return;
+    syncDailyUI();
+    growFromCode(code);
+    const day = new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+    showCodeNote(`Today's maze for ${day}. Everyone who taps Today's Maze today gets this same one.`);
+  }
+
   // A grown maze is planned in full first, then the plan is played back as
   // the growth animation. Planning first lets us check the finished maze
   // (S and E wherever the child put them) and quietly try again when the
@@ -1635,6 +1778,7 @@
     seed = Number.isInteger(seed) ? seed : null;
     exitUserSolveMode(false);
     cancelAnimation();
+    syncDailyUI();
 
     const myRunId = runId;
     running = true;
@@ -1842,7 +1986,13 @@
       distance: '—',
       shortest: '—'
     });
-    setStatus('Maze complete. Now discover how the search wave finds the finish.', 'Built');
+    const builtMessage = 'Maze complete. Now discover how the search wave finds the finish.';
+    setStatus(builtMessage, 'Built');
+    isTodaysMaze().then(today => {
+      if (today && myRunId === runId && statusEl.textContent === builtMessage) {
+        statusEl.textContent = "Today's maze is ready. Everyone gets this same maze today. Solve it yourself, or discover the path.";
+      }
+    }, () => {});
 
     // Little kids go straight from watching the maze grow to drawing in it.
     if (simpleMode) enterUserSolveMode();
@@ -2769,6 +2919,7 @@
     successBest.textContent = String(userOptimalCells);
     successEfficiency.textContent = `${efficiency}%`;
     fillSimpleResult(efficiency, elapsed);
+    rememberDailyResult(efficiency).catch(() => {});
 
     createConfetti();
 
@@ -3238,6 +3389,13 @@
   buttons.end.addEventListener('click', () => setMode('end'));
 
   document.getElementById('generateBtn').addEventListener('click', animateMazeGrowth);
+  dailyBtn.addEventListener('click', growDailyMaze);
+  simpleDailyTile.addEventListener('click', () => {
+    closeSimpleShapes();
+    // As with a shape tile, a pick while a maze grows starts over.
+    if (running) cancelAnimation();
+    growDailyMaze();
+  });
   codeForm.addEventListener('submit', e => {
     e.preventDefault();
     growFromCode(codeInput.value);
@@ -3533,6 +3691,7 @@
   showRelease();
   buildShapePicker();
   buildSimpleShapePicker();
+  syncDailyUI();
   // Saved settings from before shapes had a smallest size.
   fitShapeToSize();
   syncShapeUI();

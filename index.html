@@ -43,6 +43,7 @@
     <symbol id="i-again" viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8z"/></symbol>
     <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 2.5l2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 17.1l-5.9 3.2 1.3-6.5-4.9-4.5 6.6-.8z"/></symbol>
     <symbol id="i-clock" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 2a8 8 0 1 1 0 16 8 8 0 0 1 0-16zm-1 3v6l5 3 1-1.7-4-2.4V7h-2z"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24"><path d="M7 2h2v2h6V2h2v2h1a3 3 0 0 1 3 3v11a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h1V2zM5 10v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-8H5zm2 2h4v4H7v-4z"/></symbol>
     <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M18 2H6v3H3v4c0 2.2 1.8 4 4 4h.2A5 5 0 0 0 11 16.9V19H7v2h10v-2h-4v-2.1A5 5 0 0 0 16.8 13H17c2.2 0 4-1.8 4-4V5h-3V2zM5 9V7h1v3.7A2 2 0 0 1 5 9zm14 0a2 2 0 0 1-1 1.7V7h1v2z"/></symbol>
   </svg>
 
@@ -181,6 +182,13 @@
           <button id="generateBtn" class="ios-button primary">
             <svg><use href="#i-spark"></use></svg>
             <span>Grow a Maze</span>
+          </button>
+
+          <!-- One maze a day, the same for everyone (see dailyMaze in app.js). -->
+          <button id="dailyBtn" class="ios-button daily-button" aria-label="Today's maze">
+            <svg><use href="#i-calendar"></use></svg>
+            <span>Today’s Maze</span>
+            <span id="dailyBtnNote" class="daily-note"></span>
           </button>
 
           <button id="animateBtn" class="ios-button route-button">
@@ -352,7 +360,10 @@
         <!-- Build and Solve shape picker: big picture tiles; one tap grows that shape. -->
         <div id="simpleShapeSheet" class="simple-shape-sheet" hidden>
           <div class="simple-shape-backdrop" data-close-shapes></div>
-          <div id="simpleShapePicker" class="simple-shape-picker" role="radiogroup" aria-label="Pick a shape"></div>
+          <div id="simpleShapePicker" class="simple-shape-picker" role="radiogroup" aria-label="Pick a shape">
+            <!-- Today's maze: a calendar page with today's date, before the shapes. -->
+            <button id="simpleDailyTile" class="simple-daily-tile" type="button" aria-label="Today's maze"></button>
+          </div>
         </div>
 
         <div id="successSheet" class="success-sheet" hidden>
