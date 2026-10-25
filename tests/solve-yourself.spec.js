@@ -243,29 +243,29 @@ test.describe('Solve It Yourself', () => {
     await pointer.up();
   });
 
-  test('lifting pauses the attempt and the clock, then resumes from the end of the line', async ({ page }) => {
+  test('lifting pauses the line but the clock keeps running until the finish', async ({ page }) => {
     await enterSolveMode(page);
     const route = blankRoute(11);
+    const startedAt = Date.now();
     await traceCells(page, route.slice(0, 6), { pointer });
 
     await expect(page.locator('#phaseLabel')).toHaveText('Paused');
     await expect(page.locator('#status')).toContainText('Touch the end of your blue line');
     expect(await userRoute(page)).toHaveLength(6);
 
-    const pausedAt = parseFloat(await metric(page, 1));
+    const liftedAt = parseFloat(await metric(page, 1));
     await page.waitForTimeout(1500);
-    expect(parseFloat(await metric(page, 1))).toBe(pausedAt);
+    expect(parseFloat(await metric(page, 1)), 'the clock ticks while lifted').toBeGreaterThanOrEqual(liftedAt + 1.2);
 
-    const resumedAt = Date.now();
     await traceCells(page, route.slice(5), { pointer });
     await expect(page.locator('#successSheet')).toBeVisible();
-    const tracingSeconds = (Date.now() - resumedAt) / 1000;
+    const wallSeconds = (Date.now() - startedAt) / 1000;
     await expect(page.locator('#successEfficiency')).toHaveText('100%');
 
-    // The 1.5s pause is not on the clock: only the time spent drawing is.
+    // The 1.5s with the finger up is on the clock too.
     const total = parseFloat(await page.locator('#successTime').textContent());
-    expect(total).toBeGreaterThanOrEqual(pausedAt);
-    expect(total).toBeLessThanOrEqual(pausedAt + tracingSeconds + 0.2);
+    expect(total).toBeGreaterThanOrEqual(liftedAt + 1.5);
+    expect(total).toBeLessThanOrEqual(wallSeconds + 0.2);
   });
 
   test('resume forgives a touch that lands just beside the end of the line', async ({ page }) => {

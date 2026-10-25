@@ -713,7 +713,7 @@ Do not silently begin from an arbitrary location.
 If the user lifts before reaching the finish:
 
 - keep the route visible
-- pause the attempt
+- pause the line (the clock keeps running, section 27)
 - preserve state
 - allow them to resume from the current end of their path
 
@@ -767,7 +767,7 @@ Example:
 14.7s
 ```
 
-If the player lifts Pencil/finger and the attempt is paused, the time should not continue advancing while paused.
+The clock starts when the line leaves S and keeps running until F, including while the Pencil or finger is lifted. Only a fresh start on S, a new or changed maze, or leaving solve mode stops it. The recorded step times (`times` in My Mazes) count from the same start, so they include the lifted gaps.
 
 ---
 
@@ -1250,7 +1250,7 @@ Update individual cells when practical.
 - Pencil works
 - finger works
 - direct backtracking retracts the route
-- lifting pauses the attempt
+- lifting pauses the line while the clock keeps running
 - route can resume from its endpoint
 - reaching Finish triggers completion
 - stats are sensible
