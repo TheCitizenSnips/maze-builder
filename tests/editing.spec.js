@@ -220,8 +220,13 @@ test.describe('Blank maze and editing', () => {
     for (let r = 3; r <= 7; r++) expect(maze.right[r][1]).toBe(true);
     expect(wallCount(maze)).toBe(5);
 
-    await page.locator('#startBtn').tap();
-    await expect(page.locator('#startBtn')).toHaveClass(/active/);
+    // Chrome sometimes drops a tap that lands the instant after the drawing
+    // finger lifts (no real finger is that quick), so tap again until the
+    // tool is picked. Picking Start twice is harmless.
+    await expect(async () => {
+      await page.locator('#startBtn').tap();
+      await expect(page.locator('#startBtn')).toHaveClass(/active/, { timeout: 500 });
+    }).toPass({ timeout: 10000 });
     await page.locator('#maze').scrollIntoViewIfNeeded();
     const target = await cellCenter(page, 5, 5);
     await touch('touchStart', [{ ...target, id: 0 }]);
