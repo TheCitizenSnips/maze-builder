@@ -292,7 +292,7 @@ Do not randomly change these meanings from screen to screen.
 
 ### Trace colours a child picks
 
-The three search colours (Frontier, Explored, Shortest path) are the child's to choose: tapping one in the key above the maze opens a small palette (`TRACE_HUES` in `app.js`). Each hue comes in the shade for its job (soft for explored, brighter for the wave, strongest for the route), so the route still stands out when two traces share a hue. The picks are remembered like other settings; the defaults are the cyan, blue and gold above. Walls, Start and Finish keep their fixed colours. Reset all options, folded behind the ⓘ at the top right, forgets every remembered choice after a second tap.
+The three search colours (Frontier, Explored, Shortest path) are the child's to choose: tapping one in the key above the maze opens a small palette (`TRACE_HUES` in `app.js`). Each hue comes in the shade for its job (soft for explored, brighter for the wave, strongest for the route), so the route still stands out when two traces share a hue. The picks are remembered like other settings; the defaults are the cyan, blue and gold above. Walls, Start and Finish keep their fixed colours. Reset all options, folded behind the ⓘ at the top right, forgets every remembered setting after a second tap (saved mazes and today's star stay).
 
 ---
 
@@ -456,6 +456,10 @@ The maze code (`formatMazeCode` / `readMazeCode`) packs version, seed, size, the
 ### Today's maze
 
 Today's Maze (above Grow a Maze, and a calendar tile with today's date at the top of the Kid Mode shape sheet) grows one maze a day, the same on every device with no server (`dailyMaze` in `app.js`). The day is the device's local calendar date, so it changes at local midnight. SHA-256 (SubtleCrypto) of a fixed salt (`DAILY_SALT`), the date and a try number gives the shape and seed; tries go on in the same order everywhere until the route check passes, so all devices settle on the same seed. Neighbouring days share nothing, so tomorrow's maze cannot be counted up to from today's code (anyone reading `app.js` can still compute it; without a server that cannot be helped). The daily maze is a 21 × 21 Hard maze in any shape and is an ordinary maze code once grown, so Copy, Share link and Print work as usual. Solving it marks the buttons Solved (a gold star on the tile) until the day ends (`mazeBuilder.daily` in localStorage). `tests/daily.spec.js` pins two days' codes: changing the salt, size, style or planner changes every day's maze.
+
+### My Mazes
+
+Every finish of a maze with a code is saved on the device (`rememberSolve`, localStorage `mazeBuilder.mazes`): one entry per code holding its best finish, with a small PNG of the drawn route, the score, time, effort, back-ups and the whole attempt (`ways`, one U/D/L/R per step with back-ups included, and `times`, the timer's tenths at each step) so a ghost replay can use it later. My Mazes (Utilities card; a gold trophy button in Kid Mode once something is saved) lists Best 10 (score, then time), Try Again (lowest scores below 100%) and up to 10 Favourites (heart on the success sheet). Favourites count plays (grown again from the code, or Try again); an 11th replaces the one played least, and the sheet says so. Only entries on a list are kept. Reset all options leaves them (it only removes `mazeBuilder.settings`); Forget my mazes, full mode only, clears them after a second tap. A hand-edited maze has no code, so it is not saved and has no heart. `tests/my-mazes.spec.js` covers this.
 
 Do not replace this with random wall placement.
 

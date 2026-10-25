@@ -44,6 +44,7 @@
     <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 2.5l2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 17.1l-5.9 3.2 1.3-6.5-4.9-4.5 6.6-.8z"/></symbol>
     <symbol id="i-clock" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 2a8 8 0 1 1 0 16 8 8 0 0 1 0-16zm-1 3v6l5 3 1-1.7-4-2.4V7h-2z"/></symbol>
     <symbol id="i-calendar" viewBox="0 0 24 24"><path d="M7 2h2v2h6V2h2v2h1a3 3 0 0 1 3 3v11a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h1V2zM5 10v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-8H5zm2 2h4v4H7v-4z"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20.6s-7.6-4.6-9.5-9.4C1 7.6 3.3 4 6.9 4c2.1 0 3.9 1.1 5.1 2.8C13.2 5.1 15 4 17.1 4c3.6 0 5.9 3.6 4.4 7.2-1.9 4.8-9.5 9.4-9.5 9.4z"/></symbol>
     <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M18 2H6v3H3v4c0 2.2 1.8 4 4 4h.2A5 5 0 0 0 11 16.9V19H7v2h10v-2h-4v-2.1A5 5 0 0 0 16.8 13H17c2.2 0 4-1.8 4-4V5h-3V2zM5 9V7h1v3.7A2 2 0 0 1 5 9zm14 0a2 2 0 0 1-1 1.7V7h1v2z"/></symbol>
   </svg>
 
@@ -215,6 +216,11 @@
         <section class="group-card card-utilities">
           <div class="section-label">Utilities</div>
 
+          <button id="myMazesBtn" class="list-action">
+            <span class="list-action-leading"><svg><use href="#i-trophy"></use></svg>My Mazes</span>
+            <span class="chevron">›</span>
+          </button>
+
           <button id="instantBtn" class="list-action">
             <span class="list-action-leading"><svg><use href="#i-bolt"></use></svg>Solve Instantly</span>
             <span class="chevron">›</span>
@@ -354,6 +360,7 @@
           <button id="simpleGrowBtn" class="simple-action grow" aria-label="Grow a new maze"><svg><use href="#i-spark"></use></svg></button>
           <button id="simpleSolveBtn" class="simple-action solve" aria-label="Start your line again"><svg><use href="#i-again"></use></svg></button>
           <button id="simpleShapeBtn" class="simple-action shape" aria-label="Pick a shape" aria-haspopup="true" aria-expanded="false"><span id="simpleShapeIcon" class="simple-shape-icon"></span></button>
+          <button id="simpleMazesBtn" class="simple-action mazes" aria-label="My mazes" aria-haspopup="true" aria-expanded="false" hidden><svg><use href="#i-trophy"></use></svg></button>
           <button id="simpleFitBtn" class="simple-action fit" aria-label="See the whole maze" hidden><svg><use href="#i-zoom-fit"></use></svg></button>
         </div>
 
@@ -366,9 +373,29 @@
           </div>
         </div>
 
+        <!-- Build and Solve's My Mazes: rows of pictures, no words. -->
+        <div id="simpleMazesSheet" class="simple-shape-sheet simple-mazes-sheet" hidden>
+          <div class="simple-shape-backdrop" data-close-mazes></div>
+          <div class="simple-mazes-panel" role="group" aria-label="My mazes">
+            <div class="simple-mazes-group best">
+              <span class="simple-mazes-badge" aria-hidden="true"><svg><use href="#i-trophy"></use></svg></span>
+              <div id="simpleBestRow" class="simple-mazes-row" role="group" aria-label="Best mazes"></div>
+            </div>
+            <div class="simple-mazes-group again">
+              <span class="simple-mazes-badge" aria-hidden="true"><svg><use href="#i-again"></use></svg></span>
+              <div id="simpleAgainRow" class="simple-mazes-row" role="group" aria-label="Mazes to try again"></div>
+            </div>
+            <div class="simple-mazes-group favourites">
+              <span class="simple-mazes-badge" aria-hidden="true"><svg><use href="#i-heart"></use></svg></span>
+              <div id="simpleFavouriteRow" class="simple-mazes-row" role="group" aria-label="Favourite mazes"></div>
+            </div>
+          </div>
+        </div>
+
         <div id="successSheet" class="success-sheet" hidden>
           <div class="success-backdrop"></div>
           <div class="success-card" role="dialog" aria-modal="true" aria-labelledby="successTitle">
+            <button id="successFavBtn" class="success-fav" type="button" aria-pressed="false" aria-label="Add to favourites" hidden><svg><use href="#i-heart"></use></svg></button>
             <div class="success-icon"><svg><use href="#i-trophy"></use></svg></div>
             <div id="successKicker" class="success-kicker">Maze Complete</div>
             <div id="successTitle" class="success-title">Beautiful route.</div>
@@ -433,6 +460,29 @@
   <!-- Learn sheets: kid-friendly explainers opened by the ⓘ buttons. Each one
        describes what app.js really does, so update the words here when the
        generator, the search or the scoring changes. -->
+  <!-- My Mazes: the 10 best finishes, the 10 lowest scores and up to 10
+       favourites, kept on this device (see rememberSolve in app.js). -->
+  <dialog id="myMazesSheet" class="info-sheet my-mazes-sheet" data-tint="indigo" aria-labelledby="myMazesTitle">
+    <div class="info-sheet-card">
+      <header class="info-sheet-header">
+        <span class="info-sheet-icon"><svg><use href="#i-trophy"></use></svg></span>
+        <h2 id="myMazesTitle">My Mazes</h2>
+        <button class="info-sheet-done" data-info-close>Done</button>
+      </header>
+      <div class="info-sheet-body my-mazes-body" tabindex="-1">
+        <div class="segmented my-mazes-tabs" role="group" aria-label="Which mazes">
+          <button class="segment active" data-list="best" aria-pressed="true"><span>Best 10</span></button>
+          <button class="segment" data-list="again" aria-pressed="false"><span>Try Again</span></button>
+          <button class="segment" data-list="favourites" aria-pressed="false"><span>Favourites</span></button>
+        </div>
+        <ol id="myMazesList" class="saved-list"></ol>
+        <p id="myMazesEmpty" class="saved-empty" hidden></p>
+        <p id="myMazesNote" class="dial-note saved-note"></p>
+        <button id="myMazesForgetBtn" class="saved-forget" type="button">Forget my mazes</button>
+      </div>
+    </div>
+  </dialog>
+
   <dialog id="info-grow" class="info-sheet" data-tint="indigo" aria-labelledby="info-grow-title">
     <div class="info-sheet-card">
       <header class="info-sheet-header">
