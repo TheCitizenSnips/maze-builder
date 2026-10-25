@@ -59,6 +59,24 @@
     return poly(...pts);
   }
 
+  // A coiled band, like the groove on a snail's shell: a strip `width` wide
+  // along a spiral that winds out from radius r0 to r1 over `turns` turns.
+  function spiral(cx, cy, r0, r1, turns, width, start = 0) {
+    const steps = Math.round(turns * 24);
+    const outer = [];
+    const inner = [];
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const angle = start + t * turns * 2 * Math.PI;
+      const radius = r0 + (r1 - r0) * t;
+      const dx = Math.cos(angle);
+      const dy = Math.sin(angle);
+      outer.push([cx + (radius + width / 2) * dx, cy + (radius + width / 2) * dy]);
+      inner.push([cx + (radius - width / 2) * dx, cy + (radius - width / 2) * dy]);
+    }
+    return { kind: 'poly', points: outer.concat(inner.reverse()) };
+  }
+
   const SHAPES = [
     {
       id: 'square',
@@ -295,6 +313,75 @@
         add(ellipse(76, 80, 15)),
         cut(poly(30, 40, 38, 18, 47, 18, 47, 40), { min: 21 }),
         cut(poly(53, 40, 53, 18, 64, 18, 74, 40), { min: 21 })
+      ]
+    },
+    {
+      id: 'horse',
+      label: 'Horse',
+      parts: [
+        add(ellipse(42, 54, 30, 15)),
+        add(ellipse(64, 52, 12, 15)),
+        // An arched neck and a long head with the nose down, ears up.
+        add(poly(58, 46, 64, 26, 74, 10, 86, 12, 82, 32, 74, 60)),
+        add(poly(76, 12, 85, 5, 93, 12, 100, 30, 97, 38, 89, 38, 82, 28)),
+        add(poly(77, 11, 79, 0, 86, 8)),
+        // Legs: two chunky ones on small grids, four once there is room,
+        // the back ones bent at the hock.
+        add(rect(56, 60, 17, 40, 4), { max: 20 }),
+        add(rect(16, 60, 17, 40, 4), { max: 20 }),
+        add(poly(56, 60, 65, 62, 63, 94, 64, 100, 55, 100, 56, 94), { min: 21 }),
+        add(poly(67, 62, 75, 58, 76, 94, 77, 100, 68, 100, 69, 94), { min: 21 }),
+        add(poly(13, 56, 25, 62, 22, 74, 24, 94, 25, 100, 16, 100, 17, 94, 14, 76), { min: 21 }),
+        add(poly(28, 64, 38, 64, 35, 76, 37, 94, 38, 100, 29, 100, 30, 94, 28, 78), { min: 21 }),
+        // A flowing tail and, on big grids, a ragged mane and an eye.
+        add(poly(16, 44, 6, 48, 0, 62, 0, 78, 5, 86, 7, 72, 12, 62, 20, 56), { min: 21 }),
+        add(poly(16, 44, 6, 48, 0, 60, 2, 70, 10, 62, 20, 56), { max: 20 }),
+        add(poly(74, 10, 68, 14, 67, 19, 62, 23, 62, 28, 57, 33, 57, 40, 53, 45, 61, 47, 68, 24), { min: 31 }),
+        cut(ellipse(86, 17, 2.6), { min: 31 })
+      ]
+    },
+    {
+      id: 'donut',
+      label: 'Donut',
+      parts: [
+        add(ellipse(50, 50, 50)),
+        cut(ellipse(50, 50, 18))
+      ]
+    },
+    {
+      id: 'octopus',
+      label: 'Octopus',
+      parts: [
+        add(ellipse(50, 32, 34, 32)),
+        add(rect(14, 36, 72, 26, 8)),
+        // Curly arms: four on small grids, six once there is room.
+        add(poly(14, 52, 28, 56, 20, 80, 26, 100, 4, 96, 4, 74), { max: 24 }),
+        add(poly(32, 56, 46, 58, 44, 100, 30, 100), { max: 24 }),
+        add(poly(54, 58, 68, 56, 70, 100, 56, 100), { max: 24 }),
+        add(poly(72, 56, 86, 52, 96, 74, 96, 96, 74, 100, 80, 80), { max: 24 }),
+        add(poly(14, 50, 22, 56, 12, 78, 16, 94, 0, 90, 2, 72), { min: 25 }),
+        add(poly(26, 58, 36, 58, 30, 80, 33, 100, 20, 100, 20, 80), { min: 25 }),
+        add(poly(40, 58, 48, 58, 46, 100, 37, 100), { min: 25 }),
+        mirror(add(poly(14, 50, 22, 56, 12, 78, 16, 94, 0, 90, 2, 72), { min: 25 })),
+        mirror(add(poly(26, 58, 36, 58, 30, 80, 33, 100, 20, 100, 20, 80), { min: 25 })),
+        mirror(add(poly(40, 58, 48, 58, 46, 100, 37, 100), { min: 25 })),
+        ...pair(cut(ellipse(37, 34, 6, 7), { min: 21 }))
+      ]
+    },
+    {
+      id: 'snail',
+      label: 'Snail',
+      parts: [
+        add(ellipse(42, 44, 38, 40)),
+        add(rect(0, 74, 96, 22, 11)),
+        add(poly(72, 86, 76, 46, 92, 40, 100, 52, 98, 88)),
+        add(rect(56, 60, 24, 20)),
+        // Feelers, and the coil of the shell: a wide groove with fewer turns
+        // on small grids, a finer one on big grids.
+        add(poly(78, 46, 74, 4, 84, 4, 88, 44)),
+        add(poly(90, 44, 94, 2, 100, 6, 98, 48), { min: 25 }),
+        cut(spiral(42, 44, 5, 26, 1.25, 10, Math.PI), { max: 24 }),
+        cut(spiral(42, 44, 4, 27, 2.1, 6, Math.PI), { min: 25 })
       ]
     }
   ];

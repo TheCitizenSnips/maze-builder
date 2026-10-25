@@ -59,9 +59,11 @@ A 100% result means the player matched the mathematically shortest route.
 ## Shapes
 
 Under **Shape** in the Maze card, picture tiles pick the outline the maze
-grows in: a plain square, or one of 19 pictures (heart, star, house, castle,
+grows in: a plain square, or one of 23 pictures (heart, star, house, castle,
 rocket, tree, robot, cat, dog, bunny, fish, turtle, elephant, dinosaur,
-butterfly, capybara, Ireland, USA, car). Ireland and the USA are traced from
+butterfly, capybara, Ireland, USA, car, horse, donut, octopus, snail). The
+donut's hole and the groove coiled round the snail's shell are walled off like
+the outside, so the snail's maze winds round its shell. Ireland and the USA are traced from
 real map points and stretched to the square grid, with Florida drawn a little
 fatter so it survives on small boards. The choice is remembered like the size and speed.
 

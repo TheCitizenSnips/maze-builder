@@ -2355,17 +2355,17 @@ html.info-open body { overflow: hidden; }
   animation: shapeSheetIn 220ms cubic-bezier(.2,.8,.2,1) both;
 }
 
-/* A short landscape phone: two long rows instead of five, so every tile
-   stays on screen. The scroll is a safety net for anything shorter. */
+/* A short landscape phone: two long rows instead of six, so every tile
+   stays on screen (today's tile, then twelve shapes a row). The scroll is a
+   safety net for anything shorter. */
 @media (max-height: 600px) and (orientation: landscape) {
   .simple-shape-picker {
-    grid-template-columns: repeat(10, minmax(0, 1fr));
+    grid-template-columns: repeat(13, minmax(0, 1fr));
     gap: 10px;
-    width: min(860px, 100%);
+    width: min(940px, 100%);
     padding: 12px;
   }
-  .simple-shape-tile { min-height: 0; border-radius: 16px; }
-  .simple-shape-picker { grid-template-columns: repeat(11, minmax(0, 1fr)); }
+  .simple-shape-picker .simple-shape-tile { min-height: 0; border-radius: 16px; }
 }
 
 .simple-shape-picker {

@@ -27,6 +27,25 @@ function maskReach(mask, from) {
   return seen.size;
 }
 
+/** Steps from `from` to `to` without leaving the mask. */
+function maskWalk(mask, from, to) {
+  const n = mask.length;
+  const dist = new Map([[`${from.r},${from.c}`, 0]]);
+  const queue = [from];
+  for (let i = 0; i < queue.length; i++) {
+    const d = dist.get(`${queue[i].r},${queue[i].c}`);
+    if (queue[i].r === to.r && queue[i].c === to.c) return d;
+    for (const [dr, dc] of DIRS) {
+      const r = queue[i].r + dr;
+      const c = queue[i].c + dc;
+      if (r < 0 || c < 0 || r >= n || c >= n || !mask[r][c] || dist.has(`${r},${c}`)) continue;
+      dist.set(`${r},${c}`, d + 1);
+      queue.push({ r, c });
+    }
+  }
+  return -1;
+}
+
 const inside = (mask, p) => mask[p.r][p.c];
 const insideCount = mask => mask.flat().filter(Boolean).length;
 
@@ -42,9 +61,32 @@ test.describe('Shape masks', () => {
   // Pure checks on shapes.js; once is enough.
   test.beforeEach(({}, testInfo) => test.skip(testInfo.project.name !== 'desktop'));
 
-  test('there are 19 pictures plus the plain square', () => {
+  test('there are 23 pictures plus the plain square', () => {
     expect(Shapes.list[0].id).toBe('square');
-    expect(Shapes.list).toHaveLength(20);
+    expect(Shapes.list).toHaveLength(24);
+  });
+
+  test('the donut keeps its hole at every size', () => {
+    for (const n of SIZES) {
+      const mask = Shapes.mask('donut', n);
+      const mid = Math.floor(n / 2);
+      expect(mask[mid][mid], `donut at ${n}`).toBe(false);
+      // The hole is closed in: walking out from the middle through off
+      // squares never reaches the edge of the grid.
+      const seen = new Set([`${mid},${mid}`]);
+      const queue = [[mid, mid]];
+      for (let i = 0; i < queue.length; i++) {
+        for (const [dr, dc] of DIRS) {
+          const r = queue[i][0] + dr;
+          const c = queue[i][1] + dc;
+          expect(r >= 0 && c >= 0 && r < n && c < n, `donut hole at ${n}`).toBe(true);
+          if (mask[r][c] || seen.has(`${r},${c}`)) continue;
+          seen.add(`${r},${c}`);
+          queue.push([r, c]);
+        }
+      }
+      expect(seen.size / (n * n), `donut at ${n}`).toBeGreaterThan(0.06);
+    }
   });
 
   for (const { id } of Shapes.list) {
@@ -62,8 +104,10 @@ test.describe('Shape masks', () => {
         // One piece: every square joins up side to side.
         expect(inside(mask, start) && inside(mask, end)).toBe(true);
         expect(maskReach(mask, start), `${id} at ${n}`).toBe(count);
-        // Start and Finish sit well apart.
-        expect(Math.abs(start.r - end.r) + Math.abs(start.c - end.c), `${id} at ${n}`).toBeGreaterThanOrEqual(n * 0.6);
+        // Start and Finish sit well apart: across the grid, or (the snail's
+        // coiled shell) a long walk apart.
+        const apart = Math.abs(start.r - end.r) + Math.abs(start.c - end.c);
+        if (apart < n * 0.6) expect(maskWalk(mask, start, end), `${id} at ${n}`).toBeGreaterThanOrEqual(n * 2);
       }
     });
   }

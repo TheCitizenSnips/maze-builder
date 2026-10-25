@@ -1110,7 +1110,8 @@
   const CODE_SIZES = [11, 15, 21, 25, 31, 41, 51];
   const CODE_SHAPES = [
     'square', 'heart', 'star', 'house', 'castle', 'rocket', 'tree', 'robot', 'cat', 'dog',
-    'bunny', 'fish', 'turtle', 'elephant', 'dinosaur', 'butterfly', 'capybara', 'ireland', 'usa', 'car'
+    'bunny', 'fish', 'turtle', 'elephant', 'dinosaur', 'butterfly', 'capybara', 'ireland', 'usa', 'car',
+    'horse', 'donut', 'octopus', 'snail'
   ];
   // Characters before the check: enough for the bits, plain or with S and F.
   const CODE_PLAIN = 9;
@@ -1383,6 +1384,15 @@
   // Tries for a seed whose S-to-F route is long enough; every device tries
   // the same seeds in the same order, so they all settle on the same one.
   const DAILY_TRIES = 40;
+  // How many of CODE_SHAPES the daily maze picks from, from a given day on.
+  // New shapes join from a day a little after they ship, so a device still
+  // on the last release grows the same maze until it updates, and days
+  // already past keep their mazes. Append only.
+  const DAILY_SHAPE_POOLS = [
+    ['0000-01-01', 20],
+    ['2026-11-01', 24]
+  ];
+  const dailyShapeCount = day => DAILY_SHAPE_POOLS.filter(([from]) => from <= day).pop()[1];
   // Which day's maze was last solved, and how well, on this device.
   const DAILY_KEY = 'mazeBuilder.daily';
 
@@ -1405,7 +1415,7 @@
   function dailyMaze(day) {
     if (!dailyCache.has(day)) dailyCache.set(day, (async () => {
       const first = await dailyHash(day, 0);
-      const shape = CODE_SHAPES[first.getUint32(4) % CODE_SHAPES.length];
+      const shape = CODE_SHAPES[first.getUint32(4) % dailyShapeCount(day)];
       const mazeShape = Shapes.mask(shape, DAILY_SIZE);
       const ends = Shapes.ends(shape, DAILY_SIZE);
       const wanted = Math.floor(typicalCornerRoute(DAILY_SIZE, DAILY_STYLE, shape) / 2);
