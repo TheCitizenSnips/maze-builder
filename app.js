@@ -38,6 +38,7 @@
   const codeInput = byId('codeInput');
   const codeBuildBtn = byId('codeBuildBtn');
   const codeCopyBtn = byId('codeCopyBtn');
+  const codeShareBtn = byId('codeShareBtn');
   const codePasteBtn = byId('codePasteBtn');
   const codeNote = byId('codeNote');
   const printCode = byId('printCode');
@@ -1204,9 +1205,29 @@
     return { maze: { seed, size, style, shape, start: s, end: f } };
   }
 
-  // The first maze code in some pasted text (a message, or later a link), or
+  // Share links carry the code after the page address, like
+  //   https://thecitizensnips.github.io/maze-builder/#maze=K7M2Q-X3PAB
+  // The part after # never leaves the device, so the link opens the same
+  // page (and the same offline copy) as any other visit, and needs no server.
+  const LINK_KEY = 'maze';
+
+  function mazeLink(code) {
+    const url = new URL('./', location.href);
+    url.hash = `${LINK_KEY}=${code}`;
+    return url.href;
+  }
+
+  // The code in a link's #maze= part, or '' when it has none.
+  function codeInLink(hash) {
+    const match = String(hash).match(new RegExp(`[#&]${LINK_KEY}=([0-9A-Za-z-]+)`));
+    return match ? match[1] : '';
+  }
+
+  // The first maze code in some pasted text (a message or a share link), or
   // the text itself when there is none, so its error can say what is wrong.
   function findMazeCode(text) {
+    const linked = codeInLink(text);
+    if (linked) return linked;
     const found = String(text).match(/[0-9A-Za-z]{5}(?:[-\s]?[0-9A-Za-z]{5}){1,2}/g) || [];
     return found.find(code => readMazeCode(code).maze) || String(text).trim();
   }
@@ -1220,6 +1241,7 @@
     codeLabel.textContent = code || 'None';
     if (document.activeElement !== codeInput) codeInput.value = code;
     codeCopyBtn.disabled = !code;
+    codeShareBtn.disabled = !code;
     printCode.textContent = code ? `Maze code ${code}` : '';
   }
 
@@ -1287,6 +1309,56 @@
       codeInput.select();
       showCodeNote('Copy the code from the box.');
     }
+  }
+
+  // Share link: the share sheet where there is one (Messages, Mail, AirDrop),
+  // otherwise the link goes on the clipboard. The code rides along in the
+  // words too, for someone who will type it into the Home Screen app.
+  async function shareMazeLink() {
+    const code = grownMaze && formatMazeCode(grownMaze);
+    if (!code) return;
+    const url = mazeLink(code);
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'Maze Builder', text: `Can you solve this maze? Maze code ${code}`, url });
+        showCodeNote('Opening the link grows this very maze.');
+      } catch (error) {
+        // Closing the share sheet is not a problem worth a message.
+        if (error.name !== 'AbortError') showCodeNote('Sharing did not work. Try Copy code instead.', true);
+      }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      showCodeNote('Copied a link to this maze. Paste it into a message to share it.');
+    } catch (error) {
+      codeInput.value = url;
+      codeInput.focus();
+      codeInput.select();
+      showCodeNote('Copy the link from the box.');
+    }
+  }
+
+  // A link opened in the app (on start, or tapped while it is open) grows
+  // its maze, the way typing its code would. The code is then taken off the
+  // address, so a reload or a later grow does not bring the link back.
+  function growFromLink() {
+    const code = codeInLink(location.hash);
+    if (!code) return false;
+    const url = new URL(location.href);
+    url.hash = '';
+    history.replaceState(history.state, '', url.href.replace(/#$/, ''));
+    exitUserSolveMode(false);
+    cancelAnimation();
+    const read = readMazeCode(code);
+    if (read.error) {
+      showCodeNote(read.error, true);
+      setStatus(`That link's maze code did not work. ${read.error}`, 'Ready');
+      return false;
+    }
+    codeInput.value = code;
+    growFromCode(code);
+    return true;
   }
 
   // A grown maze is planned in full first, then the plan is played back as
@@ -3173,6 +3245,8 @@
   codeInput.addEventListener('input', () => showCodeNote(CODE_NOTE));
   codePasteBtn.addEventListener('click', pasteMazeCode);
   codeCopyBtn.addEventListener('click', copyMazeCode);
+  codeShareBtn.addEventListener('click', shareMazeLink);
+  window.addEventListener('hashchange', growFromLink);
   document.getElementById('animateBtn').addEventListener('click', animatePathDiscovery);
   document.getElementById('instantBtn').addEventListener('click', solveInstantly);
 
@@ -3459,7 +3533,7 @@
   syncLevelUI();
   makeBlankGrid();
   syncSimpleModeUI();
-  if (simpleMode) animateMazeGrowth();
+  if (!growFromLink() && simpleMode) animateMazeGrowth();
   window.addEventListener('load', registerServiceWorker);
   // Tells the check in index.html that this script started properly.
   window.mazeBuilderStarted = true;
