@@ -186,6 +186,7 @@ test.describe('Maze codes', () => {
     await openApp(page, { size: 11, speed: 'Super fast' });
     await growMaze(page);
     await expect(page.locator('#codeLabel')).not.toHaveText('None');
+    await page.click('#drawBtn');
     await toggleWall(page, 3, 3, 'right');
     await expect(page.locator('#codeLabel')).toHaveText('None');
     await expect(page.locator('#printCode')).toHaveText('');

@@ -31,6 +31,9 @@ test.describe('Growing a maze', () => {
     expect(await page.locator('#wallLayer line.zap').count()).toBeGreaterThan(0);
 
     await expect(page.locator('#phaseLabel')).toHaveText('Built', { timeout: 30_000 });
+    // A grown maze is ready to draw in: Solve It Yourself is already on.
+    await expect(page.locator('#userSolveBtn')).toHaveText(/Stop Solving/);
+    await expect(page.locator('#status')).toContainText('Touch S');
     const maze = await readMaze(page);
     expectPerfectMaze(maze);
     expect(cellsWithClass(maze, 'carve-head')).toHaveLength(0);

@@ -94,8 +94,8 @@ test.describe("Today's maze", () => {
     await expect(page.locator('#dailyBtnNote')).not.toHaveText('Solved');
     await growToday(page);
 
-    await page.click('#userSolveBtn');
-    await expect(page.locator('#phaseLabel')).toHaveText('Your Turn');
+    // A grown maze is ready to draw in straight away.
+    await expect(page.locator('#userSolveBtn')).toHaveText(/Stop Solving/);
     const pointer = await makePointer(page, defaultPointerType(testInfo));
     await traceCells(page, shortestPath(await readMaze(page)), { pointer });
     await expect(page.locator('#successSheet')).toBeVisible();
@@ -116,7 +116,6 @@ test.describe("Today's maze", () => {
     await openApp(page, { size: 11, speed: 'Super fast' });
     await page.click('#generateBtn');
     await waitForBuilt(page);
-    await page.click('#userSolveBtn');
     const pointer = await makePointer(page, defaultPointerType(testInfo));
     await traceCells(page, shortestPath(await readMaze(page)), { pointer });
     await expect(page.locator('#successSheet')).toBeVisible();

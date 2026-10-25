@@ -34,8 +34,11 @@ function expectLegalRoute(route, maze) {
 }
 
 async function enterSolveMode(page) {
-  await page.click('#userSolveBtn');
-  await expect(page.locator('#phaseLabel')).toHaveText('Your Turn');
+  // A freshly grown maze is already in solve mode.
+  if (!/Stop Solving/.test(await page.locator('#userSolveBtn').innerText())) {
+    await page.click('#userSolveBtn');
+    await expect(page.locator('#phaseLabel')).toHaveText('Your Turn');
+  }
   await expect(page.locator('#userSolveBtn')).toHaveText(/Stop Solving/);
   // On iPhone the maze sits below the controls.
   await page.locator('#maze').scrollIntoViewIfNeeded();
@@ -306,16 +309,19 @@ test.describe('Solve It Yourself', () => {
     await expect(page.locator('#successEfficiency')).toHaveText('100%');
   });
 
-  test('editing is locked while solving and Stop Solving unlocks it', async ({ page }) => {
+  test('solving locks nothing, and picking an editing tool ends the attempt', async ({ page }) => {
     await enterSolveMode(page);
-    for (const id of ['#drawBtn', '#startBtn', '#endBtn', '#generateBtn', '#animateBtn', '#instantBtn', '#blankBtn', '#sizeSelect']) {
-      await expect(page.locator(id)).toBeDisabled();
+    for (const id of ['#drawBtn', '#startBtn', '#endBtn', '#generateBtn', '#animateBtn', '#instantBtn', '#blankBtn', '#sizeSelect', '#clearSolutionBtn']) {
+      await expect(page.locator(id)).toBeEnabled();
     }
-    await expect(page.locator('#clearSolutionBtn')).toBeEnabled();
+    // No editing tool is lit while drawing.
+    await expect(page.locator('.edit-tools .active')).toHaveCount(0);
 
-    await page.click('#userSolveBtn');
+    await traceCells(page, blankRoute(11).slice(0, 4), { pointer });
+    await page.click('#drawBtn');
     await expect(page.locator('#userSolveBtn')).toHaveText(/Solve It Yourself/);
-    await expect(page.locator('#generateBtn')).toBeEnabled();
+    await expect(page.locator('#drawBtn')).toHaveClass(/active/);
+    expect(await userRoute(page)).toEqual([]);
   });
 
   test('Clear Search during a solve wipes the line and keeps solve mode', async ({ page }) => {
@@ -324,24 +330,30 @@ test.describe('Solve It Yourself', () => {
     await page.click('#clearSolutionBtn');
     expect(await userRoute(page)).toEqual([]);
     await expect(page.locator('#phaseLabel')).toHaveText('Your Turn');
-    await expect(page.locator('#drawBtn')).toBeDisabled();
+    await expect(page.locator('#userSolveBtn')).toHaveText(/Stop Solving/);
   });
 
-  test('Try Again and Done both work, and touching S after Done starts a fresh attempt', async ({ page }) => {
+  test('Try Again keeps solving; Done ends solving so the maze can be edited', async ({ page }) => {
     await enterSolveMode(page);
     await traceCells(page, blankRoute(11), { pointer });
     await expect(page.locator('#successSheet')).toBeVisible();
 
     await page.click('#successAgainBtn');
     await expect(page.locator('#successSheet')).toBeHidden();
+    await expect(page.locator('#userSolveBtn')).toHaveText(/Stop Solving/);
     expect(await userRoute(page)).toEqual([]);
 
     await traceCells(page, blankRoute(11), { pointer });
     await expect(page.locator('#successSheet')).toBeVisible();
     await page.click('#successCloseBtn');
     await expect(page.locator('#successSheet')).toBeHidden();
-    expect(await userRoute(page)).toHaveLength(21);
+    await expect(page.locator('#userSolveBtn')).toHaveText(/Solve It Yourself/);
+    await expect(page.locator('#phaseLabel')).toHaveText('Ready');
+    await expect(page.locator('#drawBtn')).toHaveClass(/active/);
+    expect(await userRoute(page)).toEqual([]);
 
+    // Solve It Yourself again starts a fresh attempt from S.
+    await page.click('#userSolveBtn');
     await traceCells(page, blankRoute(11).slice(0, 3), { pointer, keepDown: true });
     await expect(page.locator('#phaseLabel')).toHaveText('Tracing');
     expect(await userRoute(page)).toHaveLength(3);

@@ -992,7 +992,9 @@ The app supports:
 - set Start
 - set Finish
 
-Editing should be disabled while an algorithm animation is running or while the user is actively in self-solve mode when editing would invalidate the current attempt.
+Editing should be disabled while an algorithm animation is running.
+
+A freshly grown maze opens straight into Solve It Yourself, since most people want to draw in it right away. Nothing is locked while solving: picking Walls, Start or Finish (or Grow, Discover the Path, a size or shape) ends the attempt before it changes the maze, and no editing tool is lit while the player draws. On the success sheet, Done leaves solve mode so the maze can be edited; Try Again stays in it.
 
 Mode changes should be obvious through the segmented-control state.
 
