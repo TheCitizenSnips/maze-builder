@@ -116,8 +116,6 @@ test.describe('Shaped mazes', () => {
       expect(reachableCount(maze)).toBe(count);
       expect(2 * size * (size - 1) - wallCount(maze)).toBe(count - 1);
       expect(cellsWithClass(maze, 'off')).toHaveLength(size * size - count);
-      await expect(page.locator('#metricProgress')).toHaveText('100%');
-      await expect(page.locator('#metricExplored')).toHaveText(String(count));
 
       // The search keeps to the shape and finds a true shortest route.
       await page.click('#instantBtn');
@@ -161,7 +159,6 @@ test.describe('Shaped mazes', () => {
     const maze = await growMaze(page);
     const route = shortestPath(maze);
 
-    await page.click('#userSolveBtn');
     const pointer = await makePointer(page, defaultPointerType(testInfo));
     await traceCells(page, route, { pointer });
     await expect(page.locator('#phaseLabel')).toHaveText('Complete');

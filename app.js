@@ -871,14 +871,27 @@
   function setMode(nextMode) {
     if (running) return;
     mode = nextMode;
-
-    for (const [name, btn] of Object.entries(buttons)) {
-      btn.classList.toggle('active', name === mode);
-    }
+    syncModeButtons();
 
     if (mode === 'draw') setStatus('Walls mode: tap or drag along a grid line to add or remove a wall.', 'Editing');
     if (mode === 'start') setStatus('Tap a square to place the start.', 'Editing');
     if (mode === 'end') setStatus('Tap a square to place the finish.', 'Editing');
+  }
+
+  // While the player draws, no editing tool is lit: the maze is being
+  // solved, not edited.
+  function syncModeButtons() {
+    for (const [name, btn] of Object.entries(buttons)) {
+      btn.classList.toggle('active', !userSolveMode && name === mode);
+    }
+  }
+
+  // Picking an editing tool while solving ends the attempt first, so a wall
+  // or a moved S or F never lands in the middle of a line.
+  function pickTool(name) {
+    if (running) return;
+    if (userSolveMode) exitUserSolveMode(false);
+    setMode(name);
   }
 
   function clearSearchMarks() {
@@ -904,7 +917,6 @@
     render();
 
     if (userSolveMode) {
-      // Editing stays locked: the player is still in solve mode.
       resetUserAttempt();
       setStatus('Your route was cleared. Start again from S.', 'Your Turn');
     } else {
@@ -1986,16 +1998,22 @@
       distance: '—',
       shortest: '—'
     });
-    const builtMessage = 'Maze complete. Now discover how the search wave finds the finish.';
+
+    // Most people want to draw in a maze the moment it has grown, so a new
+    // maze opens straight into Solve It Yourself. Discover the Path, Grow and
+    // the editing tools all still work from here.
+    enterUserSolveMode();
+    // Kid Mode shows no words, so its drawing cue stands as it is.
+    if (simpleMode && userSolveMode) return;
+    const builtMessage = userSolveMode
+      ? 'Maze complete. Touch S and trace to F, or tap Discover the Path to watch the search wave.'
+      : 'Maze complete. Now discover how the search wave finds the finish.';
     setStatus(builtMessage, 'Built');
     isTodaysMaze().then(today => {
       if (today && myRunId === runId && statusEl.textContent === builtMessage) {
-        statusEl.textContent = "Today's maze is ready. Everyone gets this same maze today. Solve it yourself, or discover the path.";
+        statusEl.textContent = "Today's maze is ready. Everyone gets this same maze today. Touch S to solve it, or discover the path.";
       }
     }, () => {});
-
-    // Little kids go straight from watching the maze grow to drawing in it.
-    if (simpleMode) enterUserSolveMode();
   }
 
   function computeBFSLayers() {
@@ -2449,10 +2467,11 @@
     userPathOverlay.classList.remove('success');
     usePlayerMetricLabels();
     resetUserAttempt();
+    syncModeButtons();
 
-    setInteractiveDisabled(true);
-    document.getElementById('clearSolutionBtn').disabled = false;
-    userSolveBtn.disabled = false;
+    // Nothing is locked while solving: Grow, Discover the Path and the
+    // editing tools each end the attempt before they change the maze.
+    setInteractiveDisabled(false);
     bringMazeIntoView();
     revealCell(start);
 
@@ -2475,6 +2494,7 @@
     userPathSet = new Set();
     clearUserCellClasses();
     syncUserOverlay();
+    syncModeButtons();
 
     if (!running) {
       setInteractiveDisabled(false);
@@ -2974,9 +2994,13 @@
 
   successNewMazeBtn.addEventListener('click', animateMazeGrowth);
 
+  // Done means finished with this maze for now: solving ends so the maze
+  // can be edited. Try Again stays in Solve It Yourself.
   successCloseBtn.addEventListener('click', () => {
     successSheet.hidden = true;
-    setStatus('Nice work. Touch S to try this maze again, or tap Stop Solving.', 'Complete');
+    exitUserSolveMode(false);
+    resetMetrics();
+    setStatus('Nice work. Change the maze with Walls, Start or Finish, or tap Solve It Yourself to draw it again.', 'Ready');
   });
 
   // Learn sheets: each ⓘ button names a topic (grow, search, solve) and opens
@@ -3384,9 +3408,9 @@
     dial.addEventListener('change', saveSettings);
   }
 
-  buttons.draw.addEventListener('click', () => setMode('draw'));
-  buttons.start.addEventListener('click', () => setMode('start'));
-  buttons.end.addEventListener('click', () => setMode('end'));
+  buttons.draw.addEventListener('click', () => pickTool('draw'));
+  buttons.start.addEventListener('click', () => pickTool('start'));
+  buttons.end.addEventListener('click', () => pickTool('end'));
 
   document.getElementById('generateBtn').addEventListener('click', animateMazeGrowth);
   dailyBtn.addEventListener('click', growDailyMaze);
