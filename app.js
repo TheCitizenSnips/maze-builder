@@ -1378,8 +1378,8 @@
   // helped.) Changing the salt, the size or the style changes every day's
   // maze, which tests/daily.spec.js pins.
   const DAILY_SALT = 'tLJ2worBeouclMoaO-BtM3KY';
-  const DAILY_SIZE = 15;
-  const DAILY_STYLE = { twisty: LEVELS.medium.twisty, shortcuts: LEVELS.medium.shortcuts, branches: LEVELS.medium.branches };
+  const DAILY_SIZE = LEVELS.hard.size;
+  const DAILY_STYLE = { twisty: LEVELS.hard.twisty, shortcuts: LEVELS.hard.shortcuts, branches: LEVELS.hard.branches };
   // Tries for a seed whose S-to-F route is long enough; every device tries
   // the same seeds in the same order, so they all settle on the same one.
   const DAILY_TRIES = 40;

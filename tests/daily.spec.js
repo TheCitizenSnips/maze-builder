@@ -10,8 +10,8 @@ const walls = maze => ({ right: maze.right, bottom: maze.bottom, start: maze.sta
 // Pinned: changing DAILY_SALT, DAILY_SIZE, DAILY_STYLE or the planner
 // changes every day's maze. Only do that deliberately.
 const PINNED = {
-  '2026-10-25': '7RMBF-1CG8M',
-  '2026-10-26': '1Y5MQ-HCH09'
+  '2026-10-25': '7RMBF-2S88C',
+  '2026-10-26': '1Y5MQ-JS90P'
 };
 
 const at = day => new Date(`${day}T09:30:00`);
@@ -35,7 +35,7 @@ test.describe("Today's maze", () => {
     expect(code).toBe(PINNED['2026-10-25']);
     await expect(page.locator('#status')).toContainText("Today's maze is ready");
     const mine = await readMaze(page);
-    expect(mine.size).toBe(15);
+    expect(mine.size).toBe(21);
     expect(shortestPath(mine), 'the daily maze has a way through').not.toBeNull();
 
     // Someone else, another grid size saved, on the same day.

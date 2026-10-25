@@ -578,10 +578,10 @@ button { -webkit-tap-highlight-color: transparent; }
   color: var(--label);
 }
 
-/* Today's Maze: calm like Pause, in blue, with the date (or "Solved")
+/* Today's Maze, above Grow a Maze: calm like Pause, in blue, with the date (or "Solved")
    in small grey after the name. */
 .ios-button.daily-button {
-  margin-top: 8px;
+  margin-bottom: 8px;
   background: rgba(0,122,255,0.10);
   color: var(--blue);
 }
