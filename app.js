@@ -2814,7 +2814,7 @@
     }
     const last = cells[cells.length - 1];
     if (last.r !== end.r || last.c !== end.c) return null;
-    return { cells, times: run.times.map(Number), ms: run.ms };
+    return { cells, times: run.times.map(Number), ms: run.ms, efficiency: run.efficiency };
   }
 
   function ghostShown() {
@@ -2887,47 +2887,70 @@
     ghostFrame = 0;
   }
 
-  // Who reached F first, for the success sheet: the winner stands on the
-  // tall gold step. Returns null when there was no ghost to race.
+  // Who reached F first, for the success sheet, to the tenth of a second
+  // the clock shows: the winner stands on the tall gold step, and a finish
+  // in the same tenth is a tie with both on it. Returns null when there was
+  // no ghost to race.
   function fillGhostRace(raced, elapsed) {
     for (const race of ghostRaces) race.hidden = !raced;
     if (!raced) return null;
-    const ghostTime = raced.ms / 1000;
-    const youFirst = Math.round(elapsed * 10) <= Math.round(ghostTime * 10);
+    const youTenths = Math.round(elapsed * 10);
+    const ghostTenths = Math.round(raced.ms / 100);
+    const result = youTenths < ghostTenths ? 'win' : youTenths > ghostTenths ? 'lose' : 'tie';
+    const you = (youTenths / 10).toFixed(1);
+    const them = (ghostTenths / 10).toFixed(1);
     for (const race of ghostRaces) {
-      const you = race.querySelector('.you');
-      const other = race.querySelector('.ghost');
-      you.classList.toggle('first', youFirst);
-      other.classList.toggle('first', !youFirst);
-      you.querySelector('.ghost-podium').textContent = youFirst ? '1' : '2';
-      other.querySelector('.ghost-podium').textContent = youFirst ? '2' : '1';
-      you.querySelector('b').textContent = `${elapsed.toFixed(1)}s`;
-      other.querySelector('b').textContent = `${ghostTime.toFixed(1)}s`;
+      const youLane = race.querySelector('.you');
+      const ghostLane = race.querySelector('.ghost');
+      youLane.classList.toggle('first', result !== 'lose');
+      ghostLane.classList.toggle('first', result !== 'win');
+      youLane.querySelector('.ghost-podium').textContent = result === 'lose' ? '2' : '1';
+      ghostLane.querySelector('.ghost-podium').textContent = result === 'win' ? '2' : '1';
+      youLane.querySelector('b').textContent = `${you}s`;
+      ghostLane.querySelector('b').textContent = `${them}s`;
       race.setAttribute('role', 'img');
-      race.setAttribute('aria-label', youFirst
-        ? `You beat your ghost: ${elapsed.toFixed(1)} seconds to its ${ghostTime.toFixed(1)}.`
-        : `Your ghost got there first: ${ghostTime.toFixed(1)} seconds to your ${elapsed.toFixed(1)}.`);
+      race.setAttribute('aria-label', {
+        win: `You beat your ghost: ${you} seconds to its ${them}.`,
+        tie: `A tie with your ghost: both ${you} seconds.`,
+        lose: `Your ghost got there first: ${them} seconds to your ${you}.`
+      }[result]);
     }
-    return { youFirst, gap: Math.abs(ghostTime - elapsed) };
+    return { result, gap: (Math.abs(youTenths - ghostTenths) / 10).toFixed(1) };
   }
 
-  function ghostRaceCopy(race, kept, copy) {
-    const gap = race.gap.toFixed(1);
-    if (race.youFirst) {
+  // Which run is the ghost next time follows rememberSolve: the better
+  // score, then the quicker exact time. Say why, so the sheet never
+  // contradicts the podium.
+  function ghostRaceCopy(race, raced, efficiency, elapsed, kept, copy) {
+    const ms = Math.round(elapsed * 1000);
+    const shorter = efficiency !== raced.efficiency;
+    const why = kept
+      ? (shorter ? 'Your route was shorter, so this run is your new ghost.' : 'This run is your new ghost.')
+      : shorter
+        ? 'Your ghost had fewer extra squares, so it stays your ghost.'
+        : raced.ms < ms
+          ? 'Your ghost was a hair quicker, so it stays your ghost.'
+          : 'Your ghost set this time first, so it stays your ghost.';
+    if (race.result === 'win') {
       return {
         kicker: 'You Beat Your Ghost',
-        title: race.gap < 0.05 ? 'Right on its heels!' : `${gap} seconds faster!`,
-        subtitle: kept
-          ? 'This run is your new ghost.'
-          : 'Your ghost had fewer extra squares, so it stays your ghost. Can you beat it on both?'
+        title: `${race.gap} seconds faster!`,
+        subtitle: kept ? why : `${why} Can you beat it on both?`
+      };
+    }
+    if (race.result === 'tie') {
+      return {
+        kicker: 'Neck and Neck',
+        title: 'A tie with your ghost!',
+        subtitle: kept && !shorter ? 'You were a hair quicker, so this run is your new ghost.' : why
       };
     }
     return {
       kicker: copy.kicker,
       title: copy.title,
       subtitle: kept
-        ? `Your ghost was ${gap}s quicker, but your route was shorter, so this run is your new ghost.`
-        : `Your ghost got there ${gap}s sooner. Try again and catch it!`
+        ? `Your ghost was ${race.gap}s quicker, but your route was shorter, so this run is your new ghost.`
+        : `Your ghost got there ${race.gap}s sooner. Try again and catch it!`
     };
   }
 
@@ -3515,7 +3538,7 @@
     const kept = rememberSolve(efficiency, elapsed);
     const race = fillGhostRace(raced, elapsed);
     const plain = celebrationCopy(efficiency, elapsed);
-    const copy = race ? ghostRaceCopy(race, kept, plain) : plain;
+    const copy = race ? ghostRaceCopy(race, raced, efficiency, elapsed, kept, plain) : plain;
     successKicker.textContent = copy.kicker;
     successTitle.textContent = copy.title;
     successSubtitle.textContent = copy.subtitle;
