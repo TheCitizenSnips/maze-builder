@@ -44,6 +44,9 @@
     <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 2.5l2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 17.1l-5.9 3.2 1.3-6.5-4.9-4.5 6.6-.8z"/></symbol>
     <symbol id="i-clock" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 2a8 8 0 1 1 0 16 8 8 0 0 1 0-16zm-1 3v6l5 3 1-1.7-4-2.4V7h-2z"/></symbol>
     <symbol id="i-calendar" viewBox="0 0 24 24"><path d="M7 2h2v2h6V2h2v2h1a3 3 0 0 1 3 3v11a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h1V2zM5 10v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-8H5zm2 2h4v4H7v-4z"/></symbol>
+    <!-- The ghost of a saved run: a friendly sheet with eyes, coloured in
+         itself so it reads the same in the maze, the chip and the sheet. -->
+    <symbol id="i-ghost" viewBox="-12 -12 24 24"><path d="M-9 8V-1A9 9 0 0 1 9-1V8l-3-2.6L3 8 0 5.4-3 8l-3-2.6z" fill="#fff" fill-opacity="0.94" stroke="#8e8ea0" stroke-width="1.6" stroke-linejoin="round"/><ellipse cx="-3.3" cy="-1.1" rx="1.4" ry="2" fill="#1c2b4f"/><ellipse cx="3.3" cy="-1.1" rx="1.4" ry="2" fill="#1c2b4f"/></symbol>
     <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20.6s-7.6-4.6-9.5-9.4C1 7.6 3.3 4 6.9 4c2.1 0 3.9 1.1 5.1 2.8C13.2 5.1 15 4 17.1 4c3.6 0 5.9 3.6 4.4 7.2-1.9 4.8-9.5 9.4-9.5 9.4z"/></symbol>
     <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M18 2H6v3H3v4c0 2.2 1.8 4 4 4h.2A5 5 0 0 0 11 16.9V19H7v2h10v-2h-4v-2.1A5 5 0 0 0 16.8 13H17c2.2 0 4-1.8 4-4V5h-3V2zM5 9V7h1v3.7A2 2 0 0 1 5 9zm14 0a2 2 0 0 1-1 1.7V7h1v2z"/></symbol>
   </svg>
@@ -273,6 +276,11 @@
               <button id="infoNowBtn" class="info-button" data-info="now" aria-label="What is happening in the maze?"><svg><use href="#i-info"></use></svg></button>
             </div>
             <div id="status" class="status-text">Tap “Grow a Maze” to watch one build itself.</div>
+            <!-- Shown when this maze has a saved run to race. Tap to hide or
+                 bring back the ghost. -->
+            <button id="ghostChip" class="ghost-chip" type="button" aria-pressed="true" hidden>
+              <svg aria-hidden="true"><use href="#i-ghost"></use></svg><span id="ghostChipLabel">Ghost</span>
+            </button>
           </div>
 
           <button id="userSolveBtn" class="ios-button play-button" aria-describedby="playHint">
@@ -329,9 +337,17 @@
             <div id="maze" role="grid" aria-label="Maze grid"></div>
             <svg id="wallLayer" class="wall-layer" preserveAspectRatio="none" aria-hidden="true"></svg>
             <svg id="userPathOverlay" class="user-path-overlay" aria-hidden="true">
+              <!-- The ghost's trail: the best saved run on this maze, played
+                   back at its own pace under the player's line. -->
+              <g id="ghostLayer" class="ghost-layer" display="none">
+                <polyline id="ghostTrail" class="ghost-trail" points=""></polyline>
+              </g>
               <polyline id="userPathGlow" class="user-path-glow" points=""></polyline>
               <polyline id="userPathLine" class="user-path-line" points=""></polyline>
               <circle id="userPathHead" class="user-path-head" cx="0" cy="0" r="0"></circle>
+              <!-- The ghost itself floats over the line, so it stays in sight
+                   when the player passes it. -->
+              <use id="ghostHead" class="ghost-head" href="#i-ghost" x="0" y="0" width="0" height="0" display="none"></use>
             </svg>
           </div>
           </div>
@@ -401,6 +417,12 @@
             <div id="successTitle" class="success-title">Beautiful route.</div>
             <div id="successSubtitle" class="success-subtitle">You found the finish.</div>
 
+            <!-- Who reached F first, when this run raced a ghost. -->
+            <div class="ghost-race" hidden>
+              <div class="ghost-lane you"><span class="ghost-lane-icon you-dot"></span><span class="ghost-podium"></span><b></b></div>
+              <div class="ghost-lane ghost"><svg class="ghost-lane-icon" aria-hidden="true"><use href="#i-ghost"></use></svg><span class="ghost-podium"></span><b></b></div>
+            </div>
+
             <div class="success-metrics">
               <div><span id="successTime">0.0s</span><small>Time</small></div>
               <div><span id="successCells">0</span><small>Cells covered</small></div>
@@ -417,6 +439,10 @@
             <div class="simple-result">
               <div id="simpleStars" class="simple-stars" role="img" aria-label="3 of 3 stars">
                 <svg><use href="#i-star"></use></svg><svg><use href="#i-star"></use></svg><svg><use href="#i-star"></use></svg>
+              </div>
+              <div class="ghost-race" hidden>
+                <div class="ghost-lane you"><span class="ghost-lane-icon you-dot"></span><span class="ghost-podium"></span><b></b></div>
+                <div class="ghost-lane ghost"><svg class="ghost-lane-icon" aria-hidden="true"><use href="#i-ghost"></use></svg><span class="ghost-podium"></span><b></b></div>
               </div>
               <div id="simpleResultTitle" class="simple-result-title">Perfect!</div>
               <div class="simple-compare">
@@ -621,13 +647,16 @@
           <li><strong>Tap Solve It Yourself.</strong></li>
           <li><strong>Put your Pencil or finger on S.</strong></li>
           <li><strong>Draw to F.</strong> Stay in the open paths. You can’t go through walls or jump over squares.</li>
-          <li><strong>Lifted by mistake?</strong> No problem. Your line waits for you and the clock stops. Touch the end of your line to keep going.</li>
+          <li><strong>Lifted by mistake?</strong> No problem. Your line waits for you, but the clock keeps going. Touch the end of your line to keep going.</li>
           <li><strong>Wrong way?</strong> Go back along your line and it rubs out.</li>
         </ol>
 
+        <h3>Race your ghost</h3>
+        <p>Play a maze you have finished before and a little ghost races you. It is your best run on that maze, played back exactly as you drew it, wrong turns and all. It sets off when your line leaves S. Get to F first and your run becomes the new ghost. Tap the ghost button above the maze to hide it.</p>
+
         <h3 id="info-solve-score">Your score</h3>
         <dl class="info-terms">
-          <div><dt>Time</dt><dd>How long you took. The clock stops while your Pencil is lifted.</dd></div>
+          <div><dt>Time</dt><dd>How long you took, from leaving S to reaching F. The clock keeps going while your Pencil is lifted.</dd></div>
           <div><dt>Cells</dt><dd>Every square you step on, starting with S. Going back counts too, because you still walked there.</dd></div>
           <div><dt>Best</dt><dd>The fewest squares it takes to get from S to F. The computer finds this with its search wave before you start.</dd></div>
           <div><dt>Efficiency</dt><dd>Best divided by Cells. Walk the shortest way and you get 100%: a Perfect Route!</dd></div>

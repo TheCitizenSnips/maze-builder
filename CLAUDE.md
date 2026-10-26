@@ -461,6 +461,10 @@ Today's Maze (above Grow a Maze, and a calendar tile with today's date at the to
 
 Every finish of a maze with a code is saved on the device (`rememberSolve`, localStorage `mazeBuilder.mazes`): one entry per code holding its best finish, with a small PNG of the drawn route, the score, time, effort, back-ups and the whole attempt (`ways`, one U/D/L/R per step with back-ups included, and `times`, the timer's tenths at each step) so a ghost replay can use it later. My Mazes (Utilities card; a gold trophy button in Kid Mode once something is saved) lists Best 10 (score, then time), Try Again (lowest scores below 100%) and up to 10 Favourites (heart on the success sheet). Favourites count plays (grown again from the code, or Try again); an 11th replaces the one played least, and the sheet says so. Only entries on a list are kept. Reset all options leaves them (it only removes `mazeBuilder.settings`); Forget my mazes, full mode only, clears them after a second tap. A hand-edited maze has no code, so it is not saved and has no heart. `tests/my-mazes.spec.js` covers this.
 
+### Ghost replay
+
+When a maze has a saved finish in My Mazes (same code), Solve It Yourself races its ghost: that best run, replayed from `ways` and `times` (`loadGhost` checks every step with `canMove`; a run that does not fit gives no ghost). The ghost waits on S, sets off with the player's clock when the line leaves S and takes each step at its recorded tenth, drawn each frame from the clock (`runGhost`), so it keeps going while the line is lifted and never depends on frame rate. It is a grey ghost head floating over the line with a short dotted trail under it, in `#userPathOverlay`; it never blocks or changes the player's line or score. On reaching F the success sheet shows a two-step podium (`.ghost-race`, one in the full sheet and one in the Kid Mode result) with the winner on the gold step; the race copy says whether this run became the new ghost, which follows `rememberSolve` (score first, then time). The Ghost chip (`#ghostChip`) hides it, remembered as `ghost` in `mazeBuilder.settings`; Kid Mode always shows it. It does not print. `tests/ghost.spec.js` covers this.
+
 Do not replace this with random wall placement.
 
 The important property is that generated mazes are real mazes, not arbitrary grids that may be nonsensical.
@@ -1320,6 +1324,7 @@ New features must coexist with:
 - instant solve
 - self-solve/Pencil mode
 - Kid Mode (picture-only Build and Solve) mode
+- ghost replay
 - wall editing
 - Start/Finish editing
 - printing
@@ -1377,7 +1382,6 @@ Features that fit the product especially well include:
 - larger iPad-specific boards
 - daily maze
 - saved personal bests stored locally
-- ghost replay of previous user route
 - optimal-path replay after human completion
 - optional hints
 - “show me where I went wrong”

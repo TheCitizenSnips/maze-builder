@@ -670,6 +670,93 @@ select:disabled {
   min-width: 0;
 }
 
+.ghost-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  margin-top: 8px;
+  padding: 0 14px 0 8px;
+  border: 0;
+  border-radius: 18px;
+  background: rgba(118,118,128,0.12);
+  color: var(--label, #1c1c1e);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ghost-chip[hidden] { display: none; }
+
+.ghost-chip svg { width: 24px; height: 24px; flex: none; }
+
+.ghost-chip:active { background: rgba(118,118,128,0.22); }
+
+.ghost-chip.off { color: var(--secondary-label); }
+
+.ghost-chip.off svg { opacity: 0.4; }
+
+/* Who reached F first: the winner on the tall gold step. */
+.ghost-race {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 12px;
+  margin: 4px 0 14px;
+}
+
+.ghost-race[hidden] { display: none; }
+
+.ghost-lane {
+  order: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.ghost-lane.first { order: 1; }
+
+.ghost-lane-icon { width: 34px; height: 34px; display: block; }
+
+.you-dot {
+  box-sizing: border-box;
+  width: 28px;
+  height: 28px;
+  margin: 3px;
+  border-radius: 50%;
+  background: #fff;
+  border: 5px solid #007aff;
+}
+
+.ghost-podium {
+  width: 64px;
+  height: 40px;
+  border-radius: 12px 12px 4px 4px;
+  padding-top: 4px;
+  background: #c7c7cc;
+  color: #fff;
+  font-size: 22px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.ghost-lane.first .ghost-podium {
+  height: 62px;
+  background: #ffd60a;
+  color: #1c2b4f;
+}
+
+.ghost-lane b {
+  font-size: 14px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--secondary-label);
+}
+
 .content-header {
   margin-bottom: 14px;
   display: flex;
@@ -1346,6 +1433,7 @@ select:disabled {
   .telemetry,
   .legend,
   #userSolveBtn,
+  .ghost-chip,
   .app-info {
     display: none !important;
   }
@@ -1510,6 +1598,32 @@ select:disabled {
   stroke-width: 4;
   vector-effect: non-scaling-stroke;
   filter: drop-shadow(0 0 7px rgba(0,122,255,0.55));
+}
+
+/* The ghost of the best saved run: a soft grey sheet with eyes and a short
+   dotted trail, quieter than the player's blue line and drawn under it. */
+.ghost-trail {
+  fill: none;
+  stroke: rgba(142,142,160,0.6);
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 0.5 10;
+  vector-effect: non-scaling-stroke;
+}
+
+.ghost-head {
+  opacity: 0.9;
+  transition: transform 140ms linear;
+  filter: drop-shadow(0 1px 4px rgba(28,43,79,0.25));
+}
+
+.ghost-head.finished {
+  animation: ghost-home 900ms ease-in-out infinite alternate;
+}
+
+@keyframes ghost-home {
+  to { opacity: 0.5; }
 }
 
 .user-path-overlay.success .user-path-head {
@@ -2539,6 +2653,9 @@ html.info-open body { overflow: hidden; }
 }
 
 .simple-result { display: none; }
+
+/* Kid Mode has its own podium inside the picture result. */
+.simple-mode .success-card > .ghost-race { display: none; }
 
 .simple-mode .simple-result { display: block; }
 
