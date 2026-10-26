@@ -85,6 +85,12 @@
   const userPathGlow = byId('userPathGlow');
   const userPathLine = byId('userPathLine');
   const userPathHead = byId('userPathHead');
+  const ghostLayer = byId('ghostLayer');
+  const ghostTrail = byId('ghostTrail');
+  const ghostHead = byId('ghostHead');
+  const ghostChip = byId('ghostChip');
+  const ghostChipLabel = byId('ghostChipLabel');
+  const ghostRaces = [...document.querySelectorAll('.ghost-race')];
 
   const successSheet = byId('successSheet');
   const successKicker = byId('successKicker');
@@ -247,6 +253,9 @@
   // Build and Solve mode: the picture-only way to play for children who
   // cannot read yet. Off unless a grown-up turned it on.
   let simpleMode = false;
+  // Race the ghost of a maze's best saved run. On unless the chip turned it
+  // off; Kid Mode always shows it, since it has no chip.
+  let ghostOn = true;
 
   // A saved value only comes back if the control can still show it: a
   // listed option for a menu, a whole step within range for a dial.
@@ -266,6 +275,7 @@
     }
     if (!saved || typeof saved !== 'object') return;
     simpleMode = saved.simple === true;
+    ghostOn = saved.ghost !== false;
 
     for (const [key, control] of Object.entries(rememberedControls)) {
       const value = String(saved[key]);
@@ -277,6 +287,7 @@
     const settings = {};
     for (const [key, control] of Object.entries(rememberedControls)) settings[key] = control.value;
     settings.simple = simpleMode;
+    settings.ghost = ghostOn;
     try {
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
     } catch (error) {
@@ -323,6 +334,11 @@
   let userSteps = [];
   let userOptimalCells = null;
   let userCompleted = false;
+  // The run this attempt races (see loadGhost), how far into it the ghost
+  // has got in milliseconds, and the frame that moves it.
+  let ghost = null;
+  let ghostAt = 0;
+  let ghostFrame = 0;
   let userPointerId = null;
   let userLastPoint = null;
   let celebrationToken = 0;
@@ -1656,11 +1672,11 @@
   // the lists or this beats its best.
   function rememberSolve(efficiency, elapsedSeconds) {
     const code = grownMaze && formatMazeCode(grownMaze);
-    if (!code) return;
+    if (!code) return false;
     const saved = readSaved();
     const ms = Math.round(elapsedSeconds * 1000);
     const before = saved.results.find(result => result.code === code);
-    if (before && byBest({ efficiency, ms }, before) >= 0) return;
+    if (before && byBest({ efficiency, ms }, before) >= 0) return false;
     const result = {
       code,
       shape: shapeId,
@@ -1679,6 +1695,7 @@
     };
     saved.results = saved.results.filter(other => other.code !== code).concat(result);
     writeSaved(saved);
+    return true;
   }
 
   // Favourites keep at most 10. Each one counts how often it is played, so
@@ -2743,6 +2760,7 @@
       userPathHead.setAttribute('r', 0);
     }
     syncSolveHints();
+    syncGhost();
   }
 
   // Picture cues for children who cannot read the status line: S pulses
@@ -2775,6 +2793,150 @@
     successSheet.hidden = true;
   }
 
+  // The ghost is the best saved run on this maze (the one My Mazes keeps for
+  // its code), replayed step by step from S. Its cells come from its own
+  // U/D/L/R steps, so a run that does not fit this maze (it went through a
+  // wall, or left the grid) gives no ghost at all.
+  function loadGhost() {
+    const code = grownMaze && formatMazeCode(grownMaze);
+    const run = code && readSaved().results.find(result => result.code === code);
+    if (!run || typeof run.ways !== 'string' || !Array.isArray(run.times)) return null;
+    if (!run.ways.length || run.times.length !== run.ways.length || !/^[UDLR]+$/.test(run.ways)) return null;
+    const cells = [{ r: start.r, c: start.c }];
+    for (const way of run.ways) {
+      const from = cells[cells.length - 1];
+      const to = {
+        r: from.r + (way === 'D') - (way === 'U'),
+        c: from.c + (way === 'R') - (way === 'L')
+      };
+      if (!canMove(from, to)) return null;
+      cells.push(to);
+    }
+    const last = cells[cells.length - 1];
+    if (last.r !== end.r || last.c !== end.c) return null;
+    return { cells, times: run.times.map(Number), ms: run.ms };
+  }
+
+  function ghostShown() {
+    return Boolean(userSolveMode && ghost && (ghostOn || simpleMode));
+  }
+
+  // Steps the ghost has taken by this point of the race: each step happens
+  // at its own tenth of a second, the same clock as the player's.
+  function ghostSteps(atMs = ghostAt) {
+    if (!ghost) return 0;
+    const tenths = atMs / 100;
+    let steps = 0;
+    while (steps < ghost.times.length && ghost.times[steps] <= tenths) steps++;
+    return steps;
+  }
+
+  // Draw the ghost where it is now: its head on the square it has reached
+  // and a short dotted trail of the squares just before, which shows which
+  // way it is heading without drawing out the whole route.
+  function syncGhost() {
+    ghostChip.hidden = !(userSolveMode && ghost);
+    if (ghost) {
+      ghostChip.setAttribute('aria-pressed', String(ghostOn));
+      ghostChip.classList.toggle('off', !ghostOn);
+      ghostChipLabel.textContent = ghostOn ? `Ghost ${(ghost.ms / 1000).toFixed(1)}s` : 'Ghost off';
+      ghostChip.setAttribute('aria-label', ghostOn
+        ? `Racing your ghost, best time ${(ghost.ms / 1000).toFixed(1)} seconds. Tap to hide it.`
+        : 'Ghost hidden. Tap to race it.');
+    }
+    if (!ghostShown()) {
+      ghostLayer.setAttribute('display', 'none');
+      ghostHead.setAttribute('display', 'none');
+      return;
+    }
+    ghostLayer.removeAttribute('display');
+    ghostHead.removeAttribute('display');
+    const steps = ghostSteps();
+    const trail = ghost.cells.slice(Math.max(0, steps - 8), steps + 1);
+    ghostTrail.setAttribute('points', trail.map(p => {
+      const pt = userCellPoint(p.r, p.c);
+      return `${pt.x},${pt.y}`;
+    }).join(' '));
+    const here = ghost.cells[steps];
+    const pt = userCellPoint(here.r, here.c);
+    const box = Math.max(18, Math.min(34, mazeEl.offsetWidth / size));
+    ghostHead.setAttribute('x', -box / 2);
+    ghostHead.setAttribute('y', -box / 2);
+    ghostHead.setAttribute('width', box);
+    ghostHead.setAttribute('height', box);
+    ghostHead.style.transform = `translate(${pt.x}px, ${pt.y}px)`;
+    ghostHead.classList.toggle('finished', steps >= ghost.cells.length - 1);
+  }
+
+  // Moves the ghost while the player's clock runs. It is drawn from the
+  // clock each frame, so a slow frame never makes it lose time.
+  function runGhost() {
+    cancelAnimationFrame(ghostFrame);
+    const frame = () => {
+      ghostFrame = 0;
+      if (!ghostShown() || !userStartedAt || userCompleted) return;
+      ghostAt = performance.now() - userStartedAt;
+      syncGhost();
+      if (ghostSteps() < ghost.times.length) ghostFrame = requestAnimationFrame(frame);
+    };
+    ghostFrame = requestAnimationFrame(frame);
+  }
+
+  function stopGhost() {
+    cancelAnimationFrame(ghostFrame);
+    ghostFrame = 0;
+  }
+
+  // Who reached F first, for the success sheet: the winner stands on the
+  // tall gold step. Returns null when there was no ghost to race.
+  function fillGhostRace(raced, elapsed) {
+    for (const race of ghostRaces) race.hidden = !raced;
+    if (!raced) return null;
+    const ghostTime = raced.ms / 1000;
+    const youFirst = Math.round(elapsed * 10) <= Math.round(ghostTime * 10);
+    for (const race of ghostRaces) {
+      const you = race.querySelector('.you');
+      const other = race.querySelector('.ghost');
+      you.classList.toggle('first', youFirst);
+      other.classList.toggle('first', !youFirst);
+      you.querySelector('.ghost-podium').textContent = youFirst ? '1' : '2';
+      other.querySelector('.ghost-podium').textContent = youFirst ? '2' : '1';
+      you.querySelector('b').textContent = `${elapsed.toFixed(1)}s`;
+      other.querySelector('b').textContent = `${ghostTime.toFixed(1)}s`;
+      race.setAttribute('role', 'img');
+      race.setAttribute('aria-label', youFirst
+        ? `You beat your ghost: ${elapsed.toFixed(1)} seconds to its ${ghostTime.toFixed(1)}.`
+        : `Your ghost got there first: ${ghostTime.toFixed(1)} seconds to your ${elapsed.toFixed(1)}.`);
+    }
+    return { youFirst, gap: Math.abs(ghostTime - elapsed) };
+  }
+
+  function ghostRaceCopy(race, kept, copy) {
+    const gap = race.gap.toFixed(1);
+    if (race.youFirst) {
+      return {
+        kicker: 'You Beat Your Ghost',
+        title: race.gap < 0.05 ? 'Right on its heels!' : `${gap} seconds faster!`,
+        subtitle: kept
+          ? 'This run is your new ghost.'
+          : 'Your ghost had fewer extra squares, so it stays your ghost. Can you beat it on both?'
+      };
+    }
+    return {
+      kicker: copy.kicker,
+      title: copy.title,
+      subtitle: kept
+        ? `Your ghost was ${gap}s quicker, but your route was shorter, so this run is your new ghost.`
+        : `Your ghost got there ${gap}s sooner. Try again and catch it!`
+    };
+  }
+
+  function readyStatus() {
+    return ghostShown()
+      ? 'Your ghost is waiting on S. Start your line on S to race it to F.'
+      : 'Touch S with Apple Pencil or your finger, then trace through the corridors to F.';
+  }
+
   function resetUserAttempt() {
     stopUserTimer();
     hideCelebration();
@@ -2788,6 +2950,9 @@
     userBacktracks = 0;
     userSteps = [];
     userStartedAt = 0;
+    stopGhost();
+    ghost = userSolveMode ? loadGhost() : null;
+    ghostAt = 0;
     userPathOverlay.classList.remove('success');
     clearUserCellClasses();
     syncUserOverlay();
@@ -2809,6 +2974,7 @@
   function startUserTimer(startedAt = performance.now()) {
     stopUserTimer();
     userStartedAt = startedAt;
+    runGhost();
 
     userTimerId = setInterval(() => {
       if (!userStartedAt || userCompleted) return;
@@ -2870,11 +3036,13 @@
     bringMazeIntoView();
     revealCell(start);
 
-    setStatus('Touch S with Apple Pencil or your finger, then trace through the corridors to F.', 'Your Turn');
+    setStatus(readyStatus(), 'Your Turn');
   }
 
   function exitUserSolveMode(updateStatus = true) {
     stopUserTimer();
+    stopGhost();
+    ghost = null;
     hideCelebration();
     userSolveMode = false;
     userTracing = false;
@@ -3311,6 +3479,13 @@
 
     const elapsed = userStartedAt ? (performance.now() - userStartedAt) / 1000 : 0;
     const efficiency = userEfficiency() || 100;
+    // The ghost stops where it was when the player reached F.
+    stopGhost();
+    const raced = ghostShown() ? ghost : null;
+    if (raced) {
+      ghostAt = elapsed * 1000;
+      syncGhost();
+    }
 
     userPathOverlay.classList.add('success');
 
@@ -3337,7 +3512,10 @@
       'Complete'
     );
 
-    const copy = celebrationCopy(efficiency, elapsed);
+    const kept = rememberSolve(efficiency, elapsed);
+    const race = fillGhostRace(raced, elapsed);
+    const plain = celebrationCopy(efficiency, elapsed);
+    const copy = race ? ghostRaceCopy(race, kept, plain) : plain;
     successKicker.textContent = copy.kicker;
     successTitle.textContent = copy.title;
     successSubtitle.textContent = copy.subtitle;
@@ -3347,7 +3525,6 @@
     successEfficiency.textContent = `${efficiency}%`;
     fillSimpleResult(efficiency, elapsed);
     rememberDailyResult(efficiency).catch(() => {});
-    rememberSolve(efficiency, elapsed);
 
     createConfetti();
 
@@ -3394,17 +3571,30 @@
     playAgainCounts();
     successSheet.hidden = true;
     resetUserAttempt();
-    setStatus('Try again. Start on S and see if you can improve your route.', 'Your Turn');
+    setStatus(ghostShown()
+      ? 'Try again. Your ghost is waiting on S for a rematch.'
+      : 'Try again. Start on S and see if you can improve your route.', 'Your Turn');
   });
 
   successReplayBtn.addEventListener('click', () => {
     playAgainCounts();
     successSheet.hidden = true;
     resetUserAttempt();
-    setStatus('Try again. Start on S and see if you can improve your route.', 'Your Turn');
+    setStatus(ghostShown()
+      ? 'Try again. Your ghost is waiting on S for a rematch.'
+      : 'Try again. Start on S and see if you can improve your route.', 'Your Turn');
   });
 
   successNewMazeBtn.addEventListener('click', animateMazeGrowth);
+
+  // The chip hides the ghost (or brings it back) for every maze, remembered
+  // like the other settings.
+  ghostChip.addEventListener('click', () => {
+    ghostOn = !ghostOn;
+    saveSettings();
+    syncGhost();
+    if (ghostOn && userStartedAt && !userCompleted) runGhost();
+  });
 
   // The heart keeps this maze in My Mazes' favourites (or lets it go).
   successFavBtn.addEventListener('click', () => {

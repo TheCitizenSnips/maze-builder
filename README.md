@@ -131,7 +131,7 @@ quickest), **Try Again** (the lowest scores, to beat) and **Favourites**
 (picked with the heart on the finish sheet). Each row has a small picture of
 the route that was drawn, the score, the time and the back-ups; a tap grows
 that maze again. Each maze keeps its best finish, along with every step of
-it and its timing, ready for a ghost replay later.
+it and its timing, which is what the ghost replays.
 
 Favourites hold 10. Each one counts how often it is played (grown again or
 drawn again with Try again), so an 11th takes the place of the one played
@@ -139,6 +139,19 @@ least. In Kid Mode a gold trophy button (once something is saved) opens rows
 of pictures: a trophy row, a try-again row and a heart row. Reset all options
 leaves My Mazes alone; **Forget my mazes** at the bottom of the sheet clears
 them after a second tap.
+
+## Race your ghost
+
+Play a maze that has a finish in My Mazes again (a row in My Mazes, Try
+Again, its code or link, or Today's Maze a second time) and a little ghost
+races you. It is the best saved run on that maze, played back step by step at
+the times it was drawn, wrong turns and back-ups included, so on a shared
+iPad the kids race whoever holds the best run. It waits on S, sets off when
+the line leaves S, and leaves a short dotted trail. The finish sheet puts the
+winner on the gold step of a two-step podium (pictures only in Kid Mode). A
+finish that beats the saved one, by score and then time, becomes the new
+ghost. The **Ghost** chip above the maze hides it (remembered like other
+settings); Kid Mode always shows it.
 
 ## Kid Mode (for little kids)
 
