@@ -148,7 +148,8 @@ races you. It is the best saved run on that maze, played back step by step at
 the times it was drawn, wrong turns and back-ups included, so on a shared
 iPad the kids race whoever holds the best run. It waits on S, sets off when
 the line leaves S, and leaves a short dotted trail. The finish sheet puts the
-winner on the gold step of a two-step podium (pictures only in Kid Mode). A
+winner on the gold step of a two-step podium (pictures only in Kid Mode);
+finishing in the same tenth of a second is a tie, with both on the gold step. A
 finish that beats the saved one, by score and then time, becomes the new
 ghost. The **Ghost** chip above the maze hides it (remembered like other
 settings); Kid Mode always shows it.

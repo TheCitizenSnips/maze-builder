@@ -37,7 +37,7 @@ function routeWithBackup(maze) {
 }
 
 // Save a finished run of this maze, taking one step every `tenthsPerStep`.
-async function saveRun(page, route, { tenthsPerStep, efficiency }) {
+async function saveRun(page, route, { tenthsPerStep, efficiency, ms }) {
   const ways = waysOf(route);
   const times = [...ways].map((_, i) => (i + 1) * tenthsPerStep);
   await page.evaluate(({ key, result }) => {
@@ -45,7 +45,7 @@ async function saveRun(page, route, { tenthsPerStep, efficiency }) {
   }, {
     key: SAVED_KEY,
     result: {
-      code: CODE, shape: 'square', size: 15, efficiency, ms: times[times.length - 1] * 100,
+      code: CODE, shape: 'square', size: 15, efficiency, ms: ms ?? times[times.length - 1] * 100,
       cells: route.length, shortest: route.length, backtracks: 0, ways, times, at: Date.now(), picture: ''
     }
   });
@@ -137,7 +137,7 @@ test.describe('Ghost replay', () => {
     await expect(race.locator('.you')).toHaveClass(/first/);
     await expect(race.locator('.you .ghost-podium')).toHaveText('1');
     await expect(page.locator('#successKicker')).toHaveText('You Beat Your Ghost');
-    await expect(page.locator('#successSubtitle')).toHaveText('This run is your new ghost.');
+    await expect(page.locator('#successSubtitle')).toHaveText('Your route was shorter, so this run is your new ghost.');
     const [result] = (await saved(page)).results;
     expect(result.efficiency).toBe(100);
     expect(result.ways).toBe(waysOf(shortestPath(maze)));
@@ -163,6 +163,43 @@ test.describe('Ghost replay', () => {
     expect((await saved(page)).results[0].efficiency).toBe(100);
     expect(page.mazeErrors).toEqual([]);
   });
+
+  // The clock stands still for these, so the player's time is exactly 0.0s
+  // and the ghost's time decides the tie.
+  const ties = [
+    { name: 'a hair slower ghost', backup: false, efficiency: 100, ms: 40, says: 'You were a hair quicker, so this run is your new ghost.', kept: true },
+    { name: 'a ghost with the same exact time', backup: false, efficiency: 100, ms: 0, says: 'Your ghost set this time first, so it stays your ghost.', kept: false },
+    { name: 'a ghost with a longer route', backup: true, efficiency: 90, ms: 0, says: 'Your route was shorter, so this run is your new ghost.', kept: true }
+  ];
+  for (const tie of ties) {
+    test(`a finish in the same tenth as ${tie.name} is a tie with both on the gold step`, async ({ page }, testInfo) => {
+      await page.addInitScript(() => {
+        const realNow = performance.now.bind(performance);
+        performance.now = () => (window.__frozenNow ?? realNow());
+      });
+      await openApp(page, { speed: 'Super fast' });
+      const maze = await growCode(page, CODE);
+      const ghostRoute = tie.backup ? routeWithBackup(maze) : shortestPath(maze);
+      await saveRun(page, ghostRoute, { tenthsPerStep: 0, efficiency: tie.efficiency, ms: tie.ms });
+      await growCode(page, CODE);
+      await page.evaluate(() => { window.__frozenNow = performance.now(); });
+      const before = (await saved(page)).results[0];
+      await solve(page, shortestPath(maze), testInfo);
+
+      const race = page.locator('.success-card > .ghost-race');
+      await expect(race.locator('.you')).toHaveClass(/first/);
+      await expect(race.locator('.ghost')).toHaveClass(/first/);
+      await expect(race.locator('.you .ghost-podium')).toHaveText('1');
+      await expect(race.locator('.ghost .ghost-podium')).toHaveText('1');
+      await expect(race).toHaveAttribute('aria-label', 'A tie with your ghost: both 0.0 seconds.');
+      await expect(page.locator('#successTitle')).toHaveText('A tie with your ghost!');
+      await expect(page.locator('#successSubtitle')).toHaveText(tie.says);
+      // A kept finish replaces the saved run; otherwise the ghost's run stays.
+      const [after] = (await saved(page)).results;
+      expect(after.at !== before.at).toBe(tie.kept);
+      expect(page.mazeErrors).toEqual([]);
+    });
+  }
 
   test('the chip hides the ghost, and that is remembered', async ({ page }, testInfo) => {
     await openApp(page, { speed: 'Super fast' });
