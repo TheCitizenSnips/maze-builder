@@ -48,6 +48,7 @@
          itself so it reads the same in the maze, the chip and the sheet. -->
     <symbol id="i-ghost" viewBox="-12 -12 24 24"><path d="M-9 8V-1A9 9 0 0 1 9-1V8l-3-2.6L3 8 0 5.4-3 8l-3-2.6z" fill="#fff" fill-opacity="0.94" stroke="#8e8ea0" stroke-width="1.6" stroke-linejoin="round"/><ellipse cx="-3.3" cy="-1.1" rx="1.4" ry="2" fill="#1c2b4f"/><ellipse cx="3.3" cy="-1.1" rx="1.4" ry="2" fill="#1c2b4f"/></symbol>
     <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20.6s-7.6-4.6-9.5-9.4C1 7.6 3.3 4 6.9 4c2.1 0 3.9 1.1 5.1 2.8C13.2 5.1 15 4 17.1 4c3.6 0 5.9 3.6 4.4 7.2-1.9 4.8-9.5 9.4-9.5 9.4z"/></symbol>
+    <symbol id="i-trap" viewBox="0 0 24 24"><path d="M12.0 1.0L13.9 7.4L19.8 4.2L16.6 10.1L23.0 12.0L16.6 13.9L19.8 19.8L13.9 16.6L12.0 23.0L10.1 16.6L4.2 19.8L7.4 13.9L1.0 12.0L7.4 10.1L4.2 4.2L10.1 7.4z"/></symbol>
     <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M18 2H6v3H3v4c0 2.2 1.8 4 4 4h.2A5 5 0 0 0 11 16.9V19H7v2h10v-2h-4v-2.1A5 5 0 0 0 16.8 13H17c2.2 0 4-1.8 4-4V5h-3V2zM5 9V7h1v3.7A2 2 0 0 1 5 9zm14 0a2 2 0 0 1-1 1.7V7h1v2z"/></symbol>
   </svg>
 
@@ -129,6 +130,14 @@
             <div id="shapePicker" class="shape-picker" role="radiogroup" aria-label="Maze shape"></div>
             <p id="shapeNote" class="dial-note shape-note" hidden>This grid is too small for a picture. Pick one and the grid grows to 15 × 15.</p>
           </details>
+
+          <!-- Traps: hidden squares on the quicker ways that send the
+               player back to S (planTraps in app.js). Off by default. -->
+          <div class="row-control traps-row">
+            <span id="trapsLabel" class="row-label-icon"><svg><use href="#i-trap"></use></svg> Traps</span>
+            <button id="trapsSwitch" class="ios-switch" type="button" role="switch" aria-checked="false" aria-labelledby="trapsLabel" aria-describedby="trapsNote"><span></span></button>
+          </div>
+          <p id="trapsNote" class="dial-note traps-note">Off. Switch on to hide a few traps in the next maze you grow.</p>
 
           <details id="styleDetails" class="style-details">
             <summary class="row-control">
@@ -318,6 +327,8 @@
           <span><i class="swatch build"></i>Growing</span>
           <span><i class="swatch start"></i>Start</span>
           <span><i class="swatch end"></i>Finish</span>
+          <!-- Shown only while the maze on screen hides traps. -->
+          <span id="trapLegend" hidden><i class="swatch trap"></i>Trap</span>
           <!-- The search colours are a child's to pick: a tap opens a small
                palette under the one tapped. -->
           <button class="legend-pick" data-trace="frontier" aria-haspopup="true" aria-expanded="false" aria-controls="tracePalette" title="Pick a colour"><i class="swatch frontier"></i>Frontier</button>
@@ -610,6 +621,7 @@
           <li><i class="swatch frontier"></i><span><strong>Frontier</strong> is the edge of the wave: the next squares to check.</span></li>
           <li><i class="swatch visited"></i><span><strong>Explored</strong> squares were already checked. They keep their colour so you can see every place the search tried.</span></li>
           <li><i class="swatch solution"></i><span><strong>Shortest path</strong> is the one route the computer keeps.</span></li>
+          <li><i class="swatch trap"></i><span><strong>Traps</strong> show as an orange burst when the wave reaches them. The computer knows where they are, so it flows round them like a wall, and its gold path never steps on one.</span></li>
         </ul>
 
         <p class="info-hint">Tap a colour in the key above the maze to pick your own colour for it.</p>
@@ -654,11 +666,14 @@
         <h3>Race your ghost</h3>
         <p>Play a maze you have finished before and a little ghost races you. It is your best run on that maze, played back exactly as you drew it, wrong turns and all. It sets off when your line leaves S. Get to F first and your run becomes the new ghost. Tap the ghost button above the maze to hide it.</p>
 
+        <h3 id="info-solve-traps">Watch out for traps</h3>
+        <p>Switch on Traps in the Maze card and the next maze you grow hides a few. They only go where there is more than one way through, and they like the quicker ways best. Step on one and it snaps: your line is wiped and you go back to S, but the clock and your Cells keep counting. A little orange burst marks the spot. A trap that has snapped is safe, so its quick way is open now, if you dare. There is always a way round every trap. Your ghost falls into the same traps you did.</p>
+
         <h3 id="info-solve-score">Your score</h3>
         <dl class="info-terms">
           <div><dt>Time</dt><dd>How long you took, from leaving S to reaching F. The clock keeps going while your Pencil is lifted.</dd></div>
           <div><dt>Cells</dt><dd>Every square you step on, starting with S. Going back counts too, because you still walked there.</dd></div>
-          <div><dt>Best</dt><dd>The fewest squares it takes to get from S to F. The computer finds this with its search wave before you start.</dd></div>
+          <div><dt>Best</dt><dd>The fewest squares it takes to get from S to F. The computer finds this with its search wave before you start. With traps, it is the best way of all: round the traps, or through one on purpose if that is quicker.</dd></div>
           <div><dt>Efficiency</dt><dd>Best divided by Cells. Walk the shortest way and you get 100%: a Perfect Route!</dd></div>
           <div><dt>Backtracks</dt><dd>How many times you went back. That’s fine. Every explorer does it!</dd></div>
         </dl>

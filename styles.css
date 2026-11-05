@@ -12,6 +12,7 @@
   --indigo: #5856d6;
   --green: #30d158;
   --red: #ff453a;
+  --trap: #ff9f0a;
   --gold: #ffd60a;
 
   --wall: #1c2b4f;
@@ -461,6 +462,55 @@ button { -webkit-tap-highlight-color: transparent; }
   font-size: 12px;
   color: var(--secondary-label);
 }
+
+/* An iOS switch (Traps): a 51 x 31 track with a sliding white knob, in a
+   44pt-tall tap area. */
+.ios-switch {
+  position: relative;
+  flex: none;
+  width: 51px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ios-switch::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6.5px;
+  width: 51px;
+  height: 31px;
+  border-radius: 16px;
+  background: rgba(120,120,128,.16);
+  transition: background-color 200ms ease;
+}
+
+.ios-switch span {
+  position: absolute;
+  left: 2px;
+  top: 8.5px;
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 3px 8px rgba(0,0,0,.15), 0 1px 1px rgba(0,0,0,.16);
+  transition: transform 200ms cubic-bezier(.3,.7,.4,1);
+}
+
+.ios-switch[aria-checked="true"]::before { background: var(--green); }
+.ios-switch[aria-checked="true"] span { transform: translateX(20px); }
+.ios-switch:active span { width: 31px; }
+.ios-switch[aria-checked="true"]:active span { transform: translateX(16px); }
+.ios-switch:disabled { opacity: .45; cursor: default; }
+.ios-switch:focus-visible { outline: none; }
+.ios-switch:focus-visible::before { box-shadow: 0 0 0 3px rgba(0,122,255,.45); }
+
+.traps-row svg { fill: var(--trap); }
+.traps-note { margin-top: -4px; }
 
 /* Maze code: the seed shows in the row; the box holds the whole code. */
 .code-label {
@@ -953,6 +1003,7 @@ select:disabled {
 .swatch.frontier { background: var(--frontier); }
 .swatch.visited { background: var(--visited); }
 .swatch.solution { background: var(--solution); }
+.swatch.trap { background: radial-gradient(circle, var(--trap) 0 38%, #fff 42%); }
 
 .maze-card {
   position: relative;
@@ -1323,6 +1374,60 @@ select:disabled {
 .cell.start::after { content: "S"; color: #248a3d; }
 .cell.end::after { content: "F"; color: #d70015; }
 
+/* Traps. Hidden until they matter: a sprung trap (the player stepped on
+   it) or one the search wave stepped round shows a small orange burst, a
+   colour no other part of the maze uses. */
+.cell.trap-found,
+.cell.trap-sprung {
+  position: relative;
+  z-index: 6;
+}
+
+.cell.trap-found::before,
+.cell.trap-sprung::before {
+  content: "";
+  position: absolute;
+  inset: 14%;
+  background: var(--trap);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 1L13.9 7.4L19.8 4.2L16.6 10.1L23 12L16.6 13.9L19.8 19.8L13.9 16.6L12 23L10.1 16.6L4.2 19.8L7.4 13.9L1 12L7.4 10.1L4.2 4.2L10.1 7.4z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 1L13.9 7.4L19.8 4.2L16.6 10.1L23 12L16.6 13.9L19.8 19.8L13.9 16.6L12 23L10.1 16.6L4.2 19.8L7.4 13.9L1 12L7.4 10.1L4.2 4.2L10.1 7.4z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+/* The search only spots it, so its mark is a lighter outline-like burst. */
+.cell.trap-found:not(.trap-sprung)::before {
+  inset: 22%;
+  opacity: 0.85;
+}
+
+.cell.trap-snap {
+  animation: trapSnap 640ms cubic-bezier(.2,.8,.2,1) both;
+}
+
+.cell.trap-snap::before {
+  animation: trapBurst 640ms cubic-bezier(.2,.8,.2,1) both;
+}
+
+@keyframes trapSnap {
+  35% { box-shadow: 0 0 0 4px rgba(255,159,10,.25), 0 0 18px 6px rgba(255,159,10,.4); }
+}
+
+@keyframes trapBurst {
+  0% { transform: scale(.2) rotate(-40deg); }
+  55% { transform: scale(1.45) rotate(10deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+
+/* The wiped line fades out rather than vanishing. */
+.user-path-overlay.trapped .user-path-line,
+.user-path-overlay.trapped .user-path-glow {
+  animation: trapWipe 420ms ease-out;
+}
+
+@keyframes trapWipe {
+  from { opacity: .2; }
+  to { opacity: 1; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -1501,6 +1606,10 @@ select:disabled {
 
   .cell { transition: none !important; }
 
+  /* A printed maze is a fresh worksheet: its traps stay a secret. */
+  .cell.trap-found::before,
+  .cell.trap-sprung::before { display: none; }
+
   .cell.carve-trail,
   .cell.carve-spark,
   .cell.carve-head,
@@ -1616,6 +1725,21 @@ select:disabled {
   opacity: 0.9;
   transition: transform 140ms linear;
   filter: drop-shadow(0 1px 4px rgba(28,43,79,0.25));
+}
+
+/* A trap catches the ghost too: it shivers on the trap, then hops back to
+   S without sliding across the walls. */
+.ghost-head.snapped {
+  animation: ghost-snap 360ms ease-in-out;
+}
+
+.ghost-head.hop {
+  transition: none;
+}
+
+@keyframes ghost-snap {
+  30% { opacity: 0.4; }
+  60% { opacity: 0.95; }
 }
 
 .ghost-head.finished {
