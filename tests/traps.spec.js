@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { openApp, readMaze, cellsWithClass, blocked, shortestPath, makePointer, defaultPointerType, traceCells, metric } = require('./helpers');
+const { openApp, readMaze, cellsWithClass, blocked, shortestPath, wallCount, makePointer, defaultPointerType, traceCells, metric } = require('./helpers');
 
 // Traps: an optional switch in the Maze card (off by default) hides a few
 // traps on the quicker ways of a maze with more than one way through. A trap
@@ -94,40 +94,65 @@ test.describe('Traps', () => {
     expect(page.mazeErrors).toEqual([]);
   });
 
-  test('switch on is remembered, and a Hard maze gets traps on the quicker ways', async ({ page }) => {
+  test('switch on is remembered, and a one-way Hard maze keeps its route and traps its dead ends', async ({ page }) => {
     await openApp(page, { speed: 'Super fast' });
     await page.click('#trapsSwitch');
     await expect(page.locator('#trapsSwitch')).toHaveAttribute('aria-checked', 'true');
     await page.reload();
     await expect(page.locator('#trapsSwitch')).toHaveAttribute('aria-checked', 'true');
 
-    // Hard has no shortcuts of its own; traps still find a second way.
     await page.click('[data-level="hard"]');
     await page.click('#generateBtn');
     await expect(page.locator('#phaseLabel')).toHaveText(/Built|Your Turn/, { timeout: 30_000 });
     await expect(page.locator('#levelLabel')).toHaveText('Hard');
-    await expect(page.locator('#status')).toContainText('hidden trap');
+    await expect(page.locator('#status')).toContainText('in the dead ends');
     const code = (await page.locator('#codeLabel').textContent()).trim();
+    const plain = await readMaze(page);
+    // Still one single way through: no extra loops for the traps.
+    expect(wallCount(plain)).toBe(2 * plain.size * (plain.size - 1) - (plain.size * plain.size - 1));
+    // Best is the one route: the traps never sit on it.
+    expect(Number(await metric(page, 3))).toBe(shortestPath(plain).length);
 
     const { maze, traps } = await trapsFound(page);
-    expect(traps.length).toBeGreaterThan(0);
-    const keys = traps.map(k);
-    expect(keys).not.toContain(k(maze.start));
-    expect(keys).not.toContain(k(maze.end));
-    // The gold route steps round every trap, and is the shortest that does.
+    const route = shortestPath(maze);
+    const onRoute = new Set(route.map(k));
     const gold = cellsWithClass(maze, 'solution');
-    expect(gold.some(p => keys.includes(k(p)))).toBe(false);
-    const safe = routeAvoiding(maze, maze.start, maze.end, traps);
-    expect(safe).not.toBeNull();
-    expect(gold.length).toBe(safe.length);
-    await expect(page.locator('#status')).toContainText('traps it stepped round');
+    expect(gold.length).toBe(route.length);
+    // Any trap the wave reached is at least two squares off the route.
+    for (const trap of traps) {
+      expect(onRoute.has(k(trap))).toBe(false);
+      const near = [[1, 0], [0, 1], [-1, 0], [0, -1]]
+        .map(([dr, dc]) => ({ r: trap.r + dr, c: trap.c + dc }))
+        .filter(q => !blocked(maze, trap, q));
+      expect(near.some(q => onRoute.has(k(q)))).toBe(false);
+    }
 
     // The code carries the traps: growing it again hides them in the same squares.
     await page.click('#generateBtn');
     await expect(page.locator('#phaseLabel')).toHaveText(/Built|Your Turn/, { timeout: 30_000 });
     await growCode(page, code);
+    await expect(page.locator('#trapLegend')).toBeVisible();
     const again = await trapsFound(page);
-    expect(again.traps.map(k)).toEqual(keys);
+    expect(again.traps.map(k)).toEqual(traps.map(k));
+    expect(page.mazeErrors).toEqual([]);
+  });
+
+  test('with more than one way through, traps sit on the ways and the gold route steps round them', async ({ page }) => {
+    await openApp(page);
+    await growCode(page, TRAP_CODE);
+    const { maze, traps } = await trapsFound(page);
+    expect(traps.length).toBeGreaterThan(0);
+    const keys = traps.map(k);
+    expect(keys).not.toContain(k(maze.start));
+    expect(keys).not.toContain(k(maze.end));
+    const gold = cellsWithClass(maze, 'solution');
+    expect(gold.some(p => keys.includes(k(p)))).toBe(false);
+    const safe = routeAvoiding(maze, maze.start, maze.end, traps);
+    expect(safe).not.toBeNull();
+    expect(gold.length).toBe(safe.length);
+    // A trap on a way through: the shortest route that ignores traps uses one.
+    expect(shortestPath(maze).length).toBeLessThan(safe.length);
+    await expect(page.locator('#status')).toContainText('traps it stepped round');
     expect(page.mazeErrors).toEqual([]);
   });
 

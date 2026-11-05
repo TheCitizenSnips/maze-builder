@@ -600,7 +600,7 @@
   function syncTrapsUI() {
     trapsSwitch.setAttribute('aria-checked', String(trapsOn));
     trapsNote.textContent = trapsOn
-      ? 'On. Hidden traps wait on the quicker ways. Step on one and you go back to S, but each one snaps only once.'
+      ? 'On. Hidden traps wait on the quicker ways, or in the dead ends when there is only one way. Step on one and you go back to S, but each one snaps only once.'
       : 'Off. Switch on to hide a few traps in the next maze you grow.';
   }
 
@@ -2243,7 +2243,6 @@
   const PLAN_BUDGET_MS = 150;
   function planLongMaze(n, style, from, to, seed = null, traps = false) {
     const shape = Shapes.mask(shapeId, n);
-    style = trapStyle(style, traps);
     const wanted = Math.floor(typicalCornerRoute(n, style, shapeId) / 2);
     const plan = (seed, giveUpWhenShort = false) => {
       const planned = planMaze(n, style, from, to, wanted, { giveUpWhenShort, shape, random: seededRandom(seed) });
@@ -2261,26 +2260,22 @@
     return plan(randomSeed());
   }
 
-  // Traps only go where there is more than one way through, so a maze
-  // style with no shortcuts (one single route) gets a few when traps are
-  // on. The level and the dials on screen stay as they are.
-  const TRAP_MIN_SHORTCUTS = 2;
-  function trapStyle(style, traps) {
-    return traps && style.shortcuts < TRAP_MIN_SHORTCUTS ? { ...style, shortcuts: TRAP_MIN_SHORTCUTS } : style;
-  }
-
   // How many traps a maze of this many squares hides: 2 on Easy, 4 on Hard,
   // never more than TRAP_MAX (which keeps the best-score search small).
   const TRAP_MAX = 6;
   const trapCount = squares => Math.max(1, Math.min(TRAP_MAX, Math.round(Math.sqrt(squares) / 5)));
 
-  // Picks the trap squares for a planned maze. A trap only goes on a square
-  // that some way from S to F passes through, but not every way: so there
-  // is always a way round every trap, and a maze with only one way through
-  // gets none. Squares on shorter routes are a little more likely to get
-  // one, so the quick way is the risky way. Traps keep clear of S, F and
-  // each other, and after each one is placed there must still be a way
-  // from S to F that steps on no trap at all.
+  // Picks the trap squares for a planned maze. Where there is more than one
+  // way through, a trap only goes on a square that some way from S to F
+  // passes through, but not every way: so there is always a way round
+  // every trap. Squares on shorter routes are a little more likely to get
+  // one, so the quick way is the risky way. A maze with only one way
+  // through (Medium and Hard) never traps that way, which would be unfair
+  // on a player who found it: its traps go into the dead ends instead, at
+  // least two squares off the route, so a wrong turn can cost a trip all
+  // the way back to S. Traps keep clear of S, F and each other, and after
+  // each one is placed there must still be a way from S to F that steps on
+  // no trap at all.
   //
   // Which squares qualify comes from the maze's blocks: pieces of the maze
   // with no single square whose loss would cut them in two. Any square in
@@ -2396,10 +2391,36 @@
     // A slight lean towards the shorter routes: the weight falls with how
     // much longer than the shortest the best route through a square is.
     const shortest = fromS[f];
-    const pool = [...candidates]
+    let inDeadEnds = false;
+    let pool = [...candidates]
       .filter(v => fromS[v] >= 3 && toF[v] >= 2)
       .sort((a, b) => a - b)
       .map(v => ({ v, weight: (shortest / (fromS[v] + toF[v])) ** 2 }));
+    if (!pool.length) {
+      // One way through: the dead ends, by how far each square is off the
+      // route (a search spreading out from every square on it).
+      const offRoute = new Int32Array(n * n).fill(-1);
+      const spread = [];
+      for (let v = 0; v < n * n; v++) {
+        if (fromS[v] >= 0 && fromS[v] + toF[v] === shortest) {
+          offRoute[v] = 0;
+          spread.push(v);
+        }
+      }
+      for (let i = 0; i < spread.length; i++) {
+        for (const j of links[spread[i]]) {
+          if (offRoute[j] < 0) {
+            offRoute[j] = offRoute[spread[i]] + 1;
+            spread.push(j);
+          }
+        }
+      }
+      inDeadEnds = true;
+      pool = [];
+      for (let v = 0; v < n * n; v++) {
+        if (offRoute[v] >= 2 && fromS[v] >= 3) pool.push({ v, weight: 1 });
+      }
+    }
     const traps = [];
     const blocked = new Set();
     const wanted = trapCount(shape ? shape.flat().filter(Boolean).length : n * n);
@@ -2417,7 +2438,10 @@
       }
       traps.push(p);
     }
-    return traps.sort((a, b) => a.r - b.r || a.c - b.c);
+    traps.sort((a, b) => a.r - b.r || a.c - b.c);
+    // Says which kind it chose, for the words shown once the maze is grown.
+    traps.inDeadEnds = inDeadEnds;
+    return traps;
   }
 
   // How long Super fast takes to play a whole maze, after planning.
@@ -2648,8 +2672,9 @@
     enterUserSolveMode();
     // Kid Mode shows no words, so its drawing cue stands as it is.
     if (simpleMode && userSolveMode) return;
-    const trapNote = plan.trapCells.length
-      ? ` ${plan.trapCells.length} hidden trap${plan.trapCells.length === 1 ? '' : 's'} on the quicker ways send you back to S.`
+    const hidden = plan.trapCells.length;
+    const trapNote = hidden
+      ? ` ${hidden} hidden trap${hidden === 1 ? '' : 's'} ${plan.trapCells.inDeadEnds ? 'in the dead ends' : 'on the quicker ways'} send${hidden === 1 ? 's' : ''} you back to S.`
       : traps ? ' This maze found no safe spot for a trap.' : '';
     const builtMessage = (userSolveMode
       ? 'Maze complete. Touch S and trace to F, or tap Discover the Path to watch the search wave.'

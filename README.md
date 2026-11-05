@@ -158,11 +158,13 @@ settings); Kid Mode always shows it.
 
 Switch on **Traps** in the Maze card (off until someone turns it on, then
 remembered) and the next maze grown hides a few traps: about 2 on Easy, 3 on
-Medium and 4 on Hard, never more than 6. They only go on squares that some
-way from S to F passes through but not every way, leaning slightly toward the
+Medium and 4 on Hard, never more than 6. Where there is more than one way
+through (Easy, or Shortcuts turned up) they only go on squares that some way
+from S to F passes through but not every way, leaning slightly toward the
 quicker ways, so there is always a way round every trap. A maze with only one
-way through (Medium and Hard have no shortcuts) grows a few extra loops when
-traps are on, so the traps have somewhere to go; the level stays as it is.
+way through (Medium and Hard) never traps that way, so finding it is never
+punished: its traps hide in the dead ends instead, where a wrong turn can
+send you all the way back to S.
 
 Stepping on a trap wipes the line and puts the player back on S. The clock,
 Cells and back-ups keep counting. A small orange burst marks the spot, and a
