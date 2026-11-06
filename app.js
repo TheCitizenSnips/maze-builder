@@ -42,6 +42,9 @@
   const codePasteBtn = byId('codePasteBtn');
   const codeNote = byId('codeNote');
   const printCode = byId('printCode');
+  const trapsSwitch = byId('trapsSwitch');
+  const trapsNote = byId('trapsNote');
+  const trapLegend = byId('trapLegend');
   // The shape pictures and masks come from shapes.js, loaded just before.
   const Shapes = window.MazeShapes;
   const dials = {
@@ -202,6 +205,17 @@
     isValid: id => Shapes.has(id)
   };
 
+  // Traps: hidden squares on the shorter routes that send the player back
+  // to S. Off unless a grown-up or child switches them on in the Maze card.
+  // The switch lives in a button, so it gets a stand-in control like the
+  // shape's.
+  let trapsOn = false;
+  const trapsControl = {
+    get value() { return trapsOn ? 'on' : 'off'; },
+    set value(v) { trapsOn = v === 'on'; },
+    isValid: v => v === 'on' || v === 'off'
+  };
+
   // The search colours are the child's to pick. Each hue comes in the shade
   // that fits each job: soft for explored squares, brighter for the wave,
   // strongest for the kept route. So the route still stands out from the
@@ -245,7 +259,7 @@
   // guarded.
   const SETTINGS_KEY = 'mazeBuilder.settings';
   const rememberedControls = {
-    size: sizeSelect, speed: speedSelect, shape: shapeControl, ...dials,
+    size: sizeSelect, speed: speedSelect, shape: shapeControl, ...dials, traps: trapsControl,
     frontierColour: traceControl('frontier'),
     exploredColour: traceControl('visited'),
     shortestColour: traceControl('solution')
@@ -496,6 +510,7 @@
     sizeSelect.disabled = disabled;
     for (const btn of levelButtons) btn.disabled = disabled;
     for (const dial of Object.values(dials)) dial.disabled = disabled;
+    trapsSwitch.disabled = disabled;
     for (const tile of shapePicker.children) tile.disabled = disabled;
     buttons.draw.disabled = disabled;
     buttons.start.disabled = disabled;
@@ -526,7 +541,13 @@
       carveTrail: false,
       newFrontier: false,
       solutionHead: false,
-      goalBurst: false
+      goalBurst: false,
+      // A trap the search wave came across (it stepped round it).
+      trapFound: false,
+      // A trap the player sprang this attempt: it stays marked and safe.
+      trapSprung: false,
+      // The moment a trap snaps, for its short burst.
+      trapSnap: false
     };
   }
 
@@ -541,6 +562,7 @@
     cell.newFrontier = false;
     cell.solutionHead = false;
     cell.goalBurst = false;
+    cell.trapFound = false;
   }
 
   function mazeStyle() {
@@ -573,6 +595,13 @@
       btn.setAttribute('aria-pressed', String(on));
     }
     levelLabel.textContent = level === 'custom' ? 'Custom' : LEVELS[level].label;
+  }
+
+  function syncTrapsUI() {
+    trapsSwitch.setAttribute('aria-checked', String(trapsOn));
+    trapsNote.textContent = trapsOn
+      ? 'On. Hidden traps wait on the quicker ways, or in the dead ends when there is only one way. Step on one and you go back to S, but each one snaps only once.'
+      : 'Off. Switch on to hide a few traps in the next maze you grow.';
   }
 
   function setSize(nextSize) {
@@ -895,6 +924,9 @@
     if (data.solution) cellEl.classList.add('solution');
     if (data.solutionHead) cellEl.classList.add('solution-head');
     if (data.goalBurst) cellEl.classList.add('goal-burst');
+    if (data.trapFound) cellEl.classList.add('trap-found');
+    if (data.trapSprung) cellEl.classList.add('trap-sprung');
+    if (data.trapSnap) cellEl.classList.add('trap-snap');
 
     if (start && start.r === r && start.c === c) cellEl.classList.add('start');
     if (end && end.r === r && end.c === c) cellEl.classList.add('end');
@@ -939,6 +971,7 @@
         cell.carveHead = false;
         cell.carveSpark = false;
         cell.carveTrail = false;
+        cell.trapFound = false;
       }
     }
   }
@@ -1209,6 +1242,9 @@
     if (moved) {
       for (const p of [maze.start, maze.end]) bits += bitsOf(p.r, 6) + bitsOf(p.c, 6);
     }
+    // Traps take one of the spare bits at the end, which older codes leave
+    // at 0, so every code made before traps still means the same maze.
+    bits += maze.traps ? '1' : '0';
     bits = bits.padEnd(5 * (moved ? CODE_WITH_ENDS : CODE_PLAIN), '0');
     let data = '';
     for (let i = 0; i < bits.length; i += 5) data += CODE_DIGITS[parseInt(bits.slice(i, i + 5), 2)];
@@ -1252,7 +1288,8 @@
         return { error: 'That code has a typo somewhere. Check each letter and number.' };
       }
     }
-    return { maze: { seed, size, style, shape, start: s, end: f } };
+    const traps = take(1) === 1;
+    return { maze: { seed, size, style, shape, start: s, end: f, traps } };
   }
 
   // Share links carry the code after the page address, like
@@ -1293,6 +1330,7 @@
     codeCopyBtn.disabled = !code;
     codeShareBtn.disabled = !code;
     printCode.textContent = code ? `Maze code ${code}` : '';
+    trapLegend.hidden = !(maze && maze.trapCells && maze.trapCells.length);
     syncSavedUI();
   }
 
@@ -1329,7 +1367,8 @@
     saveSettings();
     showCodeNote(CODE_NOTE);
     codeInput.blur();
-    animateMazeGrowth(maze.seed);
+    // A code carries its own traps; the switch is for mazes grown fresh.
+    animateMazeGrowth(maze.seed, maze.traps);
   }
 
   // Paste: reads the clipboard (iOS asks first with a small Paste bubble) and
@@ -1619,7 +1658,7 @@
 
   // A small picture of the maze with the player's line on it: walls, the
   // shape's outline, S and F, and the route from S to where it ended.
-  function savedMazePicture(route) {
+  function savedMazePicture(route, sprung = []) {
     const cell = THUMB_SIZE / (size + 1);
     const inset = cell / 2;
     const canvas = document.createElement('canvas');
@@ -1665,6 +1704,21 @@
       ctx.lineWidth = Math.max(2, cell * 0.45);
       ctx.stroke();
     }
+
+    // Sprung traps: a small orange burst, the same mark as on the maze.
+    for (const p of sprung) {
+      const cx = (p.c + 0.5) * cell;
+      const cy = (p.r + 0.5) * cell;
+      ctx.beginPath();
+      for (let i = 0; i < 16; i++) {
+        const radius = (i % 2 ? 0.2 : 0.46) * cell;
+        const angle = Math.PI * i / 8;
+        ctx[i ? 'lineTo' : 'moveTo'](cx + radius * Math.sin(angle), cy - radius * Math.cos(angle));
+      }
+      ctx.closePath();
+      ctx.fillStyle = '#ff9f0a';
+      ctx.fill();
+    }
     return canvas.toDataURL('image/png');
   }
 
@@ -1690,8 +1744,11 @@
       // tenths of a second at each step. Enough to replay the run exactly.
       ways: userSteps.map(step => step[0]).join(''),
       times: userSteps.map(step => step[1]),
+      // Traps sprung on the way, as squares. The ghost works its own trap
+      // hops out from the maze code, so these are for the list and picture.
+      traps: sprungTraps().map(p => [p.r, p.c]),
       at: Date.now(),
-      picture: savedMazePicture(userPath)
+      picture: savedMazePicture(userPath, sprungTraps())
     };
     saved.results = saved.results.filter(other => other.code !== code).concat(result);
     writeSaved(saved);
@@ -1789,6 +1846,12 @@
   };
   let savedListShown = 'best';
 
+  // "· 2 traps" for a finish that sprang some, '' otherwise.
+  const savedTraps = item => {
+    const count = Array.isArray(item.traps) ? item.traps.length : 0;
+    return count ? ` · ${count} trap${count === 1 ? '' : 's'}` : '';
+  };
+
   function savedRow(item, index) {
     const li = document.createElement('li');
     li.className = 'saved-row';
@@ -1809,7 +1872,7 @@
         <small>${known ? `<span class="saved-stars">${starsHtml(item.efficiency)}</span>` : ''}</small>
         <small class="saved-grid"></small>
       </span>
-      ${known ? `<span class="saved-score"><b>${item.efficiency}%</b><small>${savedTime(item.ms)} · ${item.backtracks} back-up${item.backtracks === 1 ? '' : 's'}</small></span>` : ''}`;
+      ${known ? `<span class="saved-score"><b>${item.efficiency}%</b><small>${savedTime(item.ms)} · ${item.backtracks} back-up${item.backtracks === 1 ? '' : 's'}${savedTraps(item)}</small></span>` : ''}`;
     open.querySelector('.saved-text b').textContent = label;
     open.querySelector('.saved-grid').textContent = [grid, known ? savedDay(item.at) : 'Not finished yet'].filter(Boolean).join(' · ');
     open.addEventListener('click', () => playSavedMaze(item.code));
@@ -2174,21 +2237,211 @@
   // Each try is a fresh seed, and the plan keeps the seed it was grown from.
   // A seed that passed plans the same maze again in one go, so a maze code
   // (`seed` given) skips the search and builds its maze straight away.
+  //
+  // With `traps` on, the plan also hides traps (planTraps) and a fresh seed
+  // must give it somewhere to put at least one.
   const PLAN_BUDGET_MS = 150;
-  function planLongMaze(n, style, from, to, seed = null) {
+  function planLongMaze(n, style, from, to, seed = null, traps = false) {
     const shape = Shapes.mask(shapeId, n);
     const wanted = Math.floor(typicalCornerRoute(n, style, shapeId) / 2);
-    const plan = (seed, giveUpWhenShort = false) => ({
-      ...planMaze(n, style, from, to, wanted, { giveUpWhenShort, shape, random: seededRandom(seed) }),
-      seed
-    });
+    const plan = (seed, giveUpWhenShort = false) => {
+      const planned = planMaze(n, style, from, to, wanted, { giveUpWhenShort, shape, random: seededRandom(seed) });
+      const trapCells = traps && !planned.short
+        ? planTraps(n, planned.walls, shape, from, to, seededRandom(hashText(`traps:${seed}`)))
+        : [];
+      return { ...planned, seed, trapCells };
+    };
     if (seed !== null) return plan(seed);
     const startedAt = performance.now();
     do {
       const tried = plan(randomSeed(), true);
-      if (!tried.short) return tried;
+      if (!tried.short && (!traps || tried.trapCells.length)) return tried;
     } while (performance.now() - startedAt < PLAN_BUDGET_MS);
     return plan(randomSeed());
+  }
+
+  // How many traps a maze of this many squares hides: 2 on Easy, 4 on Hard,
+  // never more than TRAP_MAX (which keeps the best-score search small).
+  const TRAP_MAX = 6;
+  const trapCount = squares => Math.max(1, Math.min(TRAP_MAX, Math.round(Math.sqrt(squares) / 5)));
+
+  // Picks the trap squares for a planned maze. Where there is more than one
+  // way through, a trap only goes on a square that some way from S to F
+  // passes through, but not every way: so there is always a way round
+  // every trap. Squares on shorter routes are a little more likely to get
+  // one, so the quick way is the risky way. A maze with only one way
+  // through (Medium and Hard) never traps that way, which would be unfair
+  // on a player who found it: its traps go into the dead ends instead, at
+  // least two squares off the route, so a wrong turn can cost a trip all
+  // the way back to S. Traps keep clear of S, F and each other, and after
+  // each one is placed there must still be a way from S to F that steps on
+  // no trap at all.
+  //
+  // Which squares qualify comes from the maze's blocks: pieces of the maze
+  // with no single square whose loss would cut them in two. Any square in
+  // a block on the way from S to F lies on some simple route; the squares
+  // where one block joins the next lie on every route, so they never get a
+  // trap.
+  function planTraps(n, plan, shape, from, to, random) {
+    const id = p => p.r * n + p.c;
+    const at = i => ({ r: Math.floor(i / n), c: i % n });
+    const inside = p => p.r >= 0 && p.c >= 0 && p.r < n && p.c < n && (!shape || shape[p.r][p.c]);
+    const open = (a, b) => {
+      const edge = edgeBetween(a, b);
+      return !plan[edge.side][edge.r][edge.c];
+    };
+    const links = Array.from({ length: n * n }, (_, i) => {
+      const p = at(i);
+      if (!inside(p)) return [];
+      return [[1,0],[-1,0],[0,1],[0,-1]]
+        .map(([dr, dc]) => ({ r: p.r + dr, c: p.c + dc }))
+        .filter(q => inside(q) && open(p, q))
+        .map(id);
+    });
+    const distances = (source, blocked = null) => {
+      const dist = new Int32Array(n * n).fill(-1);
+      dist[source] = 0;
+      const queue = [source];
+      for (let i = 0; i < queue.length; i++) {
+        for (const j of links[queue[i]]) {
+          if (dist[j] < 0 && !(blocked && blocked.has(j))) {
+            dist[j] = dist[queue[i]] + 1;
+            queue.push(j);
+          }
+        }
+      }
+      return dist;
+    };
+    const s = id(from);
+    const f = id(to);
+    const fromS = distances(s);
+    const toF = distances(f);
+    if (fromS[f] < 0) return [];
+
+    // Blocks (biconnected pieces) by Tarjan's method, without recursion so
+    // a 51 x 51 maze cannot run out of stack.
+    const order = new Int32Array(n * n).fill(-1);
+    const low = new Int32Array(n * n);
+    const blocks = [];
+    const edgeStack = [];
+    let counter = 0;
+    order[s] = low[s] = counter++;
+    const stack = [{ v: s, parent: -1, next: 0 }];
+    while (stack.length) {
+      const top = stack[stack.length - 1];
+      if (top.next < links[top.v].length) {
+        const w = links[top.v][top.next++];
+        if (order[w] < 0) {
+          edgeStack.push([top.v, w]);
+          order[w] = low[w] = counter++;
+          stack.push({ v: w, parent: top.v, next: 0 });
+        } else if (w !== top.parent && order[w] < order[top.v]) {
+          edgeStack.push([top.v, w]);
+          low[top.v] = Math.min(low[top.v], order[w]);
+        }
+        continue;
+      }
+      stack.pop();
+      if (top.parent < 0) continue;
+      const u = top.parent;
+      low[u] = Math.min(low[u], low[top.v]);
+      if (low[top.v] >= order[u]) {
+        const block = new Set();
+        let edge;
+        do {
+          edge = edgeStack.pop();
+          block.add(edge[0]);
+          block.add(edge[1]);
+        } while (edge[0] !== u || edge[1] !== top.v);
+        blocks.push(block);
+      }
+    }
+
+    // The way from S's piece to F's piece: blocks and the squares that join
+    // them make a tree, so a search through it finds the only way along.
+    const blocksOf = new Map();
+    blocks.forEach((block, b) => {
+      for (const v of block) {
+        if (!blocksOf.has(v)) blocksOf.set(v, []);
+        blocksOf.get(v).push(b);
+      }
+    });
+    const cameFrom = new Map([[`v${s}`, null]]);
+    const queue = [`v${s}`];
+    for (let i = 0; i < queue.length && !cameFrom.has(`v${f}`); i++) {
+      const node = queue[i];
+      const nextNodes = node[0] === 'v'
+        ? (blocksOf.get(Number(node.slice(1))) || []).map(b => `b${b}`)
+        : [...blocks[Number(node.slice(1))]].filter(v => blocksOf.get(v).length > 1 || v === f).map(v => `v${v}`);
+      for (const next of nextNodes) {
+        if (cameFrom.has(next)) continue;
+        cameFrom.set(next, node);
+        queue.push(next);
+      }
+    }
+    if (!cameFrom.has(`v${f}`)) return [];
+    const onEveryRoute = new Set();
+    const candidates = new Set();
+    for (let node = `v${f}`; node; node = cameFrom.get(node)) {
+      if (node[0] === 'v') onEveryRoute.add(Number(node.slice(1)));
+      else for (const v of blocks[Number(node.slice(1))]) candidates.add(v);
+    }
+    for (const v of onEveryRoute) candidates.delete(v);
+
+    // A slight lean towards the shorter routes: the weight falls with how
+    // much longer than the shortest the best route through a square is.
+    const shortest = fromS[f];
+    let inDeadEnds = false;
+    let pool = [...candidates]
+      .filter(v => fromS[v] >= 3 && toF[v] >= 2)
+      .sort((a, b) => a - b)
+      .map(v => ({ v, weight: (shortest / (fromS[v] + toF[v])) ** 2 }));
+    if (!pool.length) {
+      // One way through: the dead ends, by how far each square is off the
+      // route (a search spreading out from every square on it).
+      const offRoute = new Int32Array(n * n).fill(-1);
+      const spread = [];
+      for (let v = 0; v < n * n; v++) {
+        if (fromS[v] >= 0 && fromS[v] + toF[v] === shortest) {
+          offRoute[v] = 0;
+          spread.push(v);
+        }
+      }
+      for (let i = 0; i < spread.length; i++) {
+        for (const j of links[spread[i]]) {
+          if (offRoute[j] < 0) {
+            offRoute[j] = offRoute[spread[i]] + 1;
+            spread.push(j);
+          }
+        }
+      }
+      inDeadEnds = true;
+      pool = [];
+      for (let v = 0; v < n * n; v++) {
+        if (offRoute[v] >= 2 && fromS[v] >= 3) pool.push({ v, weight: 1 });
+      }
+    }
+    const traps = [];
+    const blocked = new Set();
+    const wanted = trapCount(shape ? shape.flat().filter(Boolean).length : n * n);
+    while (traps.length < wanted && pool.length) {
+      let roll = random() * pool.reduce((sum, item) => sum + item.weight, 0);
+      let pickAt = pool.findIndex(item => (roll -= item.weight) < 0);
+      if (pickAt < 0) pickAt = pool.length - 1;
+      const [{ v }] = pool.splice(pickAt, 1);
+      const p = at(v);
+      if (traps.some(t => Math.abs(t.r - p.r) + Math.abs(t.c - p.c) < 3)) continue;
+      blocked.add(v);
+      if (distances(s, blocked)[f] < 0) {
+        blocked.delete(v);
+        continue;
+      }
+      traps.push(p);
+    }
+    traps.sort((a, b) => a.r - b.r || a.c - b.c);
+    // Says which kind it chose, for the words shown once the maze is grown.
+    traps.inDeadEnds = inDeadEnds;
+    return traps;
   }
 
   // How long Super fast takes to play a whole maze, after planning.
@@ -2196,8 +2449,9 @@
 
   // Grows a new maze from a fresh seed, or from `seed` when rebuilding a maze
   // code. (A button's click hands over its event, which is not a seed.)
-  async function animateMazeGrowth(seed) {
+  async function animateMazeGrowth(seed, traps = trapsOn) {
     seed = Number.isInteger(seed) ? seed : null;
+    if (seed === null) traps = trapsOn;
     exitUserSolveMode(false);
     cancelAnimation();
     syncDailyUI();
@@ -2211,8 +2465,11 @@
 
     // S and E stay where the child put them; the maze grows around them.
     const style = mazeStyle();
-    const plan = planLongMaze(size, style, start, end, seed);
-    setGrownMaze({ seed: plan.seed, size, style, shape: shapeId, start: { ...start }, end: { ...end } });
+    const plan = planLongMaze(size, style, start, end, seed, traps);
+    setGrownMaze({
+      seed: plan.seed, size, style, shape: shapeId, start: { ...start }, end: { ...end },
+      traps, trapCells: plan.trapCells
+    });
 
     // Every edge starts as a wall; the generator knocks out one edge per
     // step until each square is joined to the rest.
@@ -2415,9 +2672,13 @@
     enterUserSolveMode();
     // Kid Mode shows no words, so its drawing cue stands as it is.
     if (simpleMode && userSolveMode) return;
-    const builtMessage = userSolveMode
+    const hidden = plan.trapCells.length;
+    const trapNote = hidden
+      ? ` ${hidden} hidden trap${hidden === 1 ? '' : 's'} ${plan.trapCells.inDeadEnds ? 'in the dead ends' : 'on the quicker ways'} send${hidden === 1 ? 's' : ''} you back to S.`
+      : traps ? ' This maze found no safe spot for a trap.' : '';
+    const builtMessage = (userSolveMode
       ? 'Maze complete. Touch S and trace to F, or tap Discover the Path to watch the search wave.'
-      : 'Maze complete. Now discover how the search wave finds the finish.';
+      : 'Maze complete. Now discover how the search wave finds the finish.') + trapNote;
     setStatus(builtMessage, 'Built');
     isTodaysMaze().then(today => {
       if (today && myRunId === runId && statusEl.textContent === builtMessage) {
@@ -2434,6 +2695,8 @@
     const previous = new Map();
     const layers = [];
     const dirs = [[1,0], [0,1], [-1,0], [0,-1]];
+    const trapKeys = new Set(grownTraps().map(p => key(p.r, p.c)));
+    const traps = [];
     let found = null;
 
     for (let i = 0; i < queue.length; i++) {
@@ -2456,6 +2719,14 @@
         const k = key(nr, nc);
         if (seen.has(k)) continue;
 
+        // The search knows where the traps are and steps round them; the
+        // wave shows each one as it reaches it.
+        if (trapKeys.has(k)) {
+          seen.add(k);
+          traps.push({ r: nr, c: nc, d: cur.d + 1 });
+          continue;
+        }
+
         seen.add(k);
         previous.set(k, { r: cur.r, c: cur.c });
         queue.push({ r: nr, c: nc, d: cur.d + 1 });
@@ -2463,7 +2734,7 @@
     }
 
     if (!found) {
-      return { found: false, layers, previous, path: [] };
+      return { found: false, layers, previous, path: [], traps };
     }
 
     const path = [];
@@ -2478,7 +2749,7 @@
     path.push(start);
     path.reverse();
 
-    return { found: true, layers, previous, path };
+    return { found: true, layers, previous, path, traps };
   }
 
   async function animatePathDiscovery() {
@@ -2523,6 +2794,12 @@
 
       const layer = result.layers[d] || [];
 
+      for (const p of result.traps) {
+        if (p.d !== d) continue;
+        grid[p.r][p.c].trapFound = true;
+        updateCell(p.r, p.c);
+      }
+
       for (const p of layer) {
         grid[p.r][p.c].frontier = true;
         grid[p.r][p.c].newFrontier = true;
@@ -2537,8 +2814,10 @@
         shortest: '—'
       });
 
+      const trapsSeen = result.traps.filter(p => p.d <= d).length;
       setStatus(
-        `Distance ${d}: ${layer.length} square${layer.length === 1 ? '' : 's'} on the wavefront. ${explored} left behind as explored.`,
+        `Distance ${d}: ${layer.length} square${layer.length === 1 ? '' : 's'} on the wavefront. ${explored} left behind as explored.` +
+          (trapsSeen ? ` ${trapsSeen} trap${trapsSeen === 1 ? '' : 's'} found and stepped round.` : ''),
         'Searching'
       );
 
@@ -2660,7 +2939,8 @@
     });
 
     setStatus(
-      `Solved. The search explored ${explored} squares and kept a shortest route of ${result.path.length - 1} steps.`,
+      `Solved. The search explored ${explored} squares and kept a shortest route of ${result.path.length - 1} steps` +
+        (result.traps.length ? ` that steps round every trap.` : '.'),
       'Solved'
     );
   }
@@ -2702,6 +2982,7 @@
     for (const p of result.path) {
       grid[p.r][p.c].solution = true;
     }
+    for (const p of result.traps) grid[p.r][p.c].trapFound = true;
 
     render();
     setMetrics({
@@ -2712,13 +2993,62 @@
       shortest: String(result.path.length - 1)
     });
     bringMazeIntoView();
-    setStatus(`Solved instantly. Shortest route: ${result.path.length - 1} steps.`, 'Solved');
+    setStatus(`Solved instantly. Shortest route: ${result.path.length - 1} steps.` +
+      (result.traps.length ? ' The orange bursts are traps it stepped round.' : ''), 'Solved');
   }
 
 
+  // The fewest squares a player can step on from S to F, counted the way
+  // their Cells are (S, every step, and the step onto a trap). Without
+  // traps that is the shortest route. With traps it is the best of every
+  // plan: going round them all, or daring to spring one on purpose (back
+  // to S, but now it is safe) when that opens a quicker way. Searched over
+  // (square, traps sprung so far), so it is exact; TRAP_MAX keeps it small.
   function shortestPathCellCount() {
     const result = computeBFSLayers();
-    return result && result.found ? result.path.length : null;
+    if (!result || !result.found) return null;
+    const trapList = grownTraps();
+    if (!trapList.length) return result.path.length;
+
+    const cells = size * size;
+    const trapBit = new Map(trapList.map((p, i) => [p.r * size + p.c, 1 << i]));
+    const seen = new Uint8Array(cells << trapList.length);
+    const startState = start.r * size + start.c;
+    let layer = [startState];
+    seen[startState] = 1;
+    for (let moves = 0; layer.length; moves++) {
+      const next = [];
+      for (const state of layer) {
+        const sprung = Math.floor(state / cells);
+        const here = state % cells;
+        const p = { r: Math.floor(here / size), c: here % size };
+        if (p.r === end.r && p.c === end.c) return moves + 1;
+        for (const [dr, dc] of [[1,0], [0,1], [-1,0], [0,-1]]) {
+          const q = { r: p.r + dr, c: p.c + dc };
+          if (!canMove(p, q)) continue;
+          const there = q.r * size + q.c;
+          const bit = trapBit.get(there) || 0;
+          const after = bit && !(sprung & bit)
+            ? (sprung | bit) * cells + startState
+            : sprung * cells + there;
+          if (seen[after]) continue;
+          seen[after] = 1;
+          next.push(after);
+        }
+      }
+      layer = next;
+    }
+    return result.path.length;
+  }
+
+  // The traps hidden in the maze on screen ([] when traps are off or the
+  // maze was changed by hand), and whether a square holds one.
+  function grownTraps() {
+    return (grownMaze && grownMaze.trapCells) || [];
+  }
+
+  function isTrap(p) {
+    return grownTraps().some(t => t.r === p.r && t.c === p.c);
   }
 
   function cellId(r, c) {
@@ -2802,19 +3132,36 @@
     const run = code && readSaved().results.find(result => result.code === code);
     if (!run || typeof run.ways !== 'string' || !Array.isArray(run.times)) return null;
     if (!run.ways.length || run.times.length !== run.ways.length || !/^[UDLR]+$/.test(run.ways)) return null;
+    // Traps catch the ghost just as they caught the player: a step onto an
+    // unsprung trap is followed by a hop back to S, a few tenths later (or
+    // with its next step, if that came sooner). `snaps` holds the places in
+    // `cells` where the ghost stood on a trap.
+    const times = run.times.map(Number);
     const cells = [{ r: start.r, c: start.c }];
-    for (const way of run.ways) {
-      const from = cells[cells.length - 1];
+    const ghostTimes = [];
+    const snaps = new Set();
+    const sprung = new Set();
+    let at = cells[0];
+    for (let i = 0; i < run.ways.length; i++) {
+      const way = run.ways[i];
       const to = {
-        r: from.r + (way === 'D') - (way === 'U'),
-        c: from.c + (way === 'R') - (way === 'L')
+        r: at.r + (way === 'D') - (way === 'U'),
+        c: at.c + (way === 'R') - (way === 'L')
       };
-      if (!canMove(from, to)) return null;
+      if (!canMove(at, to)) return null;
       cells.push(to);
+      ghostTimes.push(times[i]);
+      at = to;
+      if (isTrap(to) && !sprung.has(cellId(to.r, to.c))) {
+        sprung.add(cellId(to.r, to.c));
+        snaps.add(cells.length - 1);
+        at = { r: start.r, c: start.c };
+        cells.push(at);
+        ghostTimes.push(Math.min(times[i] + 4, i + 1 < times.length ? times[i + 1] : Infinity));
+      }
     }
-    const last = cells[cells.length - 1];
-    if (last.r !== end.r || last.c !== end.c) return null;
-    return { cells, times: run.times.map(Number), ms: run.ms, efficiency: run.efficiency };
+    if (at.r !== end.r || at.c !== end.c) return null;
+    return { cells, times: ghostTimes, snaps, ms: run.ms, efficiency: run.efficiency };
   }
 
   function ghostShown() {
@@ -2852,7 +3199,10 @@
     ghostLayer.removeAttribute('display');
     ghostHead.removeAttribute('display');
     const steps = ghostSteps();
-    const trail = ghost.cells.slice(Math.max(0, steps - 8), steps + 1);
+    // The trail never draws the hop back to S after a trap.
+    let trailFrom = Math.max(0, steps - 8);
+    for (let i = trailFrom; i < steps; i++) if (ghost.snaps.has(i)) trailFrom = i + 1;
+    const trail = ghost.cells.slice(trailFrom, steps + 1);
     ghostTrail.setAttribute('points', trail.map(p => {
       const pt = userCellPoint(p.r, p.c);
       return `${pt.x},${pt.y}`;
@@ -2866,6 +3216,8 @@
     ghostHead.setAttribute('height', box);
     ghostHead.style.transform = `translate(${pt.x}px, ${pt.y}px)`;
     ghostHead.classList.toggle('finished', steps >= ghost.cells.length - 1);
+    ghostHead.classList.toggle('snapped', ghost.snaps.has(steps));
+    ghostHead.classList.toggle('hop', ghost.snaps.has(steps - 1));
   }
 
   // Moves the ghost while the player's clock runs. It is drawn from the
@@ -2973,6 +3325,7 @@
     userBacktracks = 0;
     userSteps = [];
     userStartedAt = 0;
+    clearSprungTraps();
     stopGhost();
     ghost = userSolveMode ? loadGhost() : null;
     ghostAt = 0;
@@ -3078,6 +3431,7 @@
     userPathOverlay.classList.remove('success');
     userPath = [];
     userPathSet = new Set();
+    clearSprungTraps();
     clearUserCellClasses();
     syncUserOverlay();
     syncModeButtons();
@@ -3176,7 +3530,67 @@
 
     if (next.r === end.r && next.c === end.c) {
       completeUserSolve();
+      return;
     }
+    if (isTrap(next) && !grid[next.r][next.c].trapSprung) springTrap(next);
+  }
+
+  // " You sprang 2 traps on the way." for the finish, '' with none.
+  function trapSentence() {
+    const count = sprungTraps().length;
+    return count ? ` You sprang ${count} trap${count === 1 ? '' : 's'} on the way.` : '';
+  }
+
+  // A hidden trap snaps: the line is wiped and the player goes back to S.
+  // The clock, Cells and back-ups all carry on, since the walk still
+  // happened. The trap stays marked where it was and never snaps again
+  // this attempt, so a player who dares can now take that way safely.
+  // The line waits on S to be picked up, like a lifted line.
+  function springTrap(p) {
+    const cell = grid[p.r][p.c];
+    cell.trapSprung = true;
+    cell.trapSnap = true;
+    updateCell(p.r, p.c);
+    setTimeout(() => {
+      if (grid[p.r] && grid[p.r][p.c] === cell && cell.trapSnap) {
+        cell.trapSnap = false;
+        updateCell(p.r, p.c);
+      }
+    }, 700);
+
+    userTracing = false;
+    userPointerId = null;
+    userLastPoint = null;
+    userPath = [{ r: start.r, c: start.c }];
+    userPathSet = new Set([cellId(start.r, start.c)]);
+    userPathOverlay.classList.remove('trapped');
+    void userPathOverlay.getBoundingClientRect();
+    userPathOverlay.classList.add('trapped');
+    markUserCoveredCells();
+    syncUserOverlay();
+    updateUserMetrics();
+    revealCell(start);
+    const sprung = sprungTraps().length;
+    setStatus(sprung === 1
+      ? 'Snap! A trap sent you back to S. The clock keeps running. That trap is safe now, so its way is open if you dare.'
+      : `Snap! Trap number ${sprung} sent you back to S. Sprung traps are safe now. Touch S to keep going.`, 'Trapped');
+  }
+
+  // The traps sprung so far this attempt, in the order of the grid.
+  function sprungTraps() {
+    return grownTraps().filter(p => grid[p.r] && grid[p.r][p.c] && grid[p.r][p.c].trapSprung);
+  }
+
+  // Re-arms every trap for a fresh attempt.
+  function clearSprungTraps() {
+    for (const p of grownTraps()) {
+      const cell = grid[p.r] && grid[p.r][p.c];
+      if (!cell || !(cell.trapSprung || cell.trapSnap)) continue;
+      cell.trapSprung = false;
+      cell.trapSnap = false;
+      updateCell(p.r, p.c);
+    }
+    userPathOverlay.classList.remove('trapped');
   }
 
   // One step of the attempt: which way the line moved (U, D, L or R; a
@@ -3370,7 +3784,8 @@
       moves: userMoves,
       backtracks: userBacktracks,
       steps: userSteps.slice(),
-      startedAt: userStartedAt
+      startedAt: userStartedAt,
+      sprung: sprungTraps()
     };
   }
 
@@ -3389,6 +3804,11 @@
     userMoves = before.moves;
     userBacktracks = before.backtracks;
     userSteps = before.steps;
+    clearSprungTraps();
+    for (const p of before.sprung) {
+      grid[p.r][p.c].trapSprung = true;
+      updateCell(p.r, p.c);
+    }
     // Touching S again restarted the clock; put the attempt's own back.
     if (userStartedAt !== before.startedAt) startUserTimer(before.startedAt);
     markUserCoveredCells();
@@ -3531,7 +3951,8 @@
     });
 
     setStatus(
-      `Completed in ${elapsed.toFixed(1)}s using ${userMoves} covered cells. Best possible: ${userOptimalCells}. Efficiency: ${efficiency}%.`,
+      `Completed in ${elapsed.toFixed(1)}s using ${userMoves} covered cells. Best possible: ${userOptimalCells}. Efficiency: ${efficiency}%.` +
+        trapSentence(),
       'Complete'
     );
 
@@ -3541,7 +3962,7 @@
     const copy = race ? ghostRaceCopy(race, raced, efficiency, elapsed, kept, plain) : plain;
     successKicker.textContent = copy.kicker;
     successTitle.textContent = copy.title;
-    successSubtitle.textContent = copy.subtitle;
+    successSubtitle.textContent = copy.subtitle + trapSentence();
     successTime.textContent = `${elapsed.toFixed(1)}s`;
     successCells.textContent = String(userMoves);
     successBest.textContent = String(userOptimalCells);
@@ -4062,6 +4483,18 @@
     dial.addEventListener('change', saveSettings);
   }
 
+  // Like the dials, the switch is for the next maze grown: the maze on
+  // screen keeps the traps it has (or has not).
+  trapsSwitch.addEventListener('click', () => {
+    if (running) return;
+    trapsOn = !trapsOn;
+    syncTrapsUI();
+    saveSettings();
+    setStatus(trapsOn
+      ? 'Traps are on. Grow a maze and a few will hide on the quicker ways.'
+      : 'Traps are off. The next maze you grow has none.');
+  });
+
   buttons.draw.addEventListener('click', () => pickTool('draw'));
   buttons.start.addEventListener('click', () => pickTool('start'));
   buttons.end.addEventListener('click', () => pickTool('end'));
@@ -4382,6 +4815,7 @@
   fitShapeToSize();
   syncShapeUI();
   syncLevelUI();
+  syncTrapsUI();
   makeBlankGrid();
   syncSimpleModeUI();
   if (!growFromLink() && simpleMode) animateMazeGrowth();

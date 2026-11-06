@@ -154,6 +154,29 @@ finish that beats the saved one, by score and then time, becomes the new
 ghost. The **Ghost** chip above the maze hides it (remembered like other
 settings); Kid Mode always shows it.
 
+## Traps
+
+Switch on **Traps** in the Maze card (off until someone turns it on, then
+remembered) and the next maze grown hides a few traps: about 2 on Easy, 3 on
+Medium and 4 on Hard, never more than 6. Where there is more than one way
+through (Easy, or Shortcuts turned up) they only go on squares that some way
+from S to F passes through but not every way, leaning slightly toward the
+quicker ways, so there is always a way round every trap. A maze with only one
+way through (Medium and Hard) never traps that way, so finding it is never
+punished: its traps hide in the dead ends instead, where a wrong turn can
+send you all the way back to S.
+
+Stepping on a trap wipes the line and puts the player back on S. The clock,
+Cells and back-ups keep counting. A small orange burst marks the spot, and a
+trap that has snapped is safe for the rest of that attempt, so its quicker
+way is open to anyone who dares. **Best** is the true best plan, a dare
+included. Discover the Path knows where the traps are: the wave shows each
+one it reaches as an orange burst and flows round it, and the gold route
+never steps on one. The maze code carries the traps (codes from before traps
+keep their meaning), My Mazes remembers which traps a finish sprang, and the
+ghost falls into the same traps it did. Printed mazes keep their traps
+secret.
+
 ## Kid Mode (for little kids)
 
 A picture-only way to play for children who cannot read yet. Tap the
