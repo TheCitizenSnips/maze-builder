@@ -509,7 +509,12 @@ button { -webkit-tap-highlight-color: transparent; }
 .ios-switch:focus-visible { outline: none; }
 .ios-switch:focus-visible::before { box-shadow: 0 0 0 3px rgba(0,122,255,.45); }
 
-.traps-row svg { fill: var(--trap); }
+.traps-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.traps-icon { width: 17px; height: 17px; fill: var(--trap); }
 
 /* Maze code: the seed shows in the row; the box holds the whole code. */
 .code-label {
