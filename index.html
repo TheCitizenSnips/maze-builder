@@ -134,8 +134,11 @@
           <!-- Traps: hidden squares on the quicker ways that send the
                player back to S (planTraps in app.js). Off by default. -->
           <div class="row-control traps-row">
-            <span id="trapsLabel" class="row-label-icon"><svg><use href="#i-trap"></use></svg> Traps</span>
-            <button id="trapsSwitch" class="ios-switch" type="button" role="switch" aria-checked="false" aria-labelledby="trapsLabel"><span></span></button>
+            <span id="trapsLabel">Traps</span>
+            <span class="traps-value">
+              <svg class="traps-icon" aria-hidden="true"><use href="#i-trap"></use></svg>
+              <button id="trapsSwitch" class="ios-switch" type="button" role="switch" aria-checked="false" aria-labelledby="trapsLabel"><span></span></button>
+            </span>
           </div>
 
           <details id="styleDetails" class="style-details">
