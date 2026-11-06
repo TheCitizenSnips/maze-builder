@@ -17,11 +17,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  playwright:
+  # One machine per screen (desktop, iPad, iPhone) so the growing suite
+  # finishes well inside the time limit.
+  shard:
+    name: playwright (${{ matrix.project }})
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [desktop, ipad, iphone]
     # Pinned: Playwright 1.56.1 cannot install Chromium on ubuntu-latest
     # once that moved to Ubuntu 26.04.
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 30
     steps:
       # Full history: stale-page.spec.js serves an old release straight from git.
       - uses: actions/checkout@v4
@@ -45,12 +52,21 @@ jobs:
           node --check service-worker.js
 
       - name: Run the tests
-        run: npm test
+        run: npm test -- --project=${{ matrix.project }}
 
       - name: Keep the report
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.project }}
           path: playwright-report/
           retention-days: 7
+
+  # Keeps a single "playwright" check that passes only when every screen did.
+  playwright:
+    needs: shard
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Every screen passed
+        run: test "${{ needs.shard.result }}" = success

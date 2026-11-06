@@ -260,6 +260,8 @@ Other handy commands:
 GitHub also runs the whole suite on every pull request and every push to
 `main` (`.github/workflows/test.yml`); the result shows as the **Tests**
 check on the pull request, with the report attached when something fails.
+It runs desktop, iPad and iPhone on three machines side by side, and the
+`playwright` check passes only when all three do.
 
 The tests cover editing, maze growth (every grown maze is checked to be a
 real, fully connected maze), the search wave and its gold shortest path,
