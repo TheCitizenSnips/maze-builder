@@ -135,9 +135,8 @@
                player back to S (planTraps in app.js). Off by default. -->
           <div class="row-control traps-row">
             <span id="trapsLabel" class="row-label-icon"><svg><use href="#i-trap"></use></svg> Traps</span>
-            <button id="trapsSwitch" class="ios-switch" type="button" role="switch" aria-checked="false" aria-labelledby="trapsLabel" aria-describedby="trapsNote"><span></span></button>
+            <button id="trapsSwitch" class="ios-switch" type="button" role="switch" aria-checked="false" aria-labelledby="trapsLabel"><span></span></button>
           </div>
-          <p id="trapsNote" class="dial-note traps-note">Off. Switch on to hide a few traps in the next maze you grow.</p>
 
           <details id="styleDetails" class="style-details">
             <summary class="row-control">
@@ -372,6 +371,7 @@
               <button id="drawBtn" class="segment active"><svg><use href="#i-draw"></use></svg><span>Walls</span></button>
               <button id="startBtn" class="segment"><svg><use href="#i-start"></use></svg><span>Start</span></button>
               <button id="endBtn" class="segment"><svg><use href="#i-end"></use></svg><span>Finish</span></button>
+              <button id="trapBtn" class="segment"><svg><use href="#i-trap"></use></svg><span>Trap</span></button>
             </div>
             <span id="zoomHint" class="zoom-hint">Pinch the maze to zoom in.</span>
             <div class="zoom-buttons" role="group" aria-label="Zoom">
@@ -572,6 +572,14 @@
 
         <h3>Shapes</h3>
         <p>Pick a picture under <strong>Shape</strong>, like a cat or a rocket, and the maze grows inside it. The outline of the picture is the outside wall, so the spark only digs inside the shape. S and F start far apart, and you can still move them anywhere inside. Shapes need a grid of 15 × 15 or bigger, so there are enough squares to draw the picture.</p>
+
+        <h3 id="info-grow-traps">Traps</h3>
+        <p>Switch on <strong>Traps</strong> and the next maze you grow hides a few: 2 on Easy, 3 on Medium, 4 on Hard. Step on one while you draw and it snaps: your line is wiped and you go back to S, but the clock keeps going. A snapped trap is safe after that.</p>
+        <ul class="info-checks info-traps">
+          <li><strong>More than one way through?</strong> Traps wait on the quicker ways, but there is always a way round them.</li>
+          <li><strong>Only one way through?</strong> That way is never trapped. The traps hide in the dead ends, so a wrong turn can cost you a trip back to S.</li>
+          <li><strong>Build your own.</strong> Pick <strong>Trap</strong> under the maze and tap squares to hide traps yourself. Tap one again to take it away. They show while you build and hide while someone solves.</li>
+        </ul>
 
         <button class="info-next" data-info="search">
           <span><small>Next</small>How the search finds the way</span>

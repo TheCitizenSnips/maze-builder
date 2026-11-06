@@ -510,7 +510,6 @@ button { -webkit-tap-highlight-color: transparent; }
 .ios-switch:focus-visible::before { box-shadow: 0 0 0 3px rgba(0,122,255,.45); }
 
 .traps-row svg { fill: var(--trap); }
-.traps-note { margin-top: -4px; }
 
 /* Maze code: the seed shows in the row; the box holds the whole code. */
 .code-label {
@@ -1061,7 +1060,13 @@ select:disabled {
   margin-top: 10px;
 }
 
-.edit-tools { flex: 0 1 300px; }
+.edit-tools { flex: 0 1 390px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.edit-tools .segment { min-width: 0; padding-inline: 4px; }
+
+/* Four tools fit a small phone once their icons step aside. */
+@media (max-width: 360px) {
+  .edit-tools .segment svg { display: none; }
+}
 
 .zoom-hint {
   flex: 1 1 0;
@@ -1378,13 +1383,17 @@ select:disabled {
    it) or one the search wave stepped round shows a small orange burst, a
    colour no other part of the maze uses. */
 .cell.trap-found,
-.cell.trap-sprung {
+.cell.trap-sprung,
+.maze-stage:not(.user-solving):not(.busy) .cell.trap {
   position: relative;
   z-index: 6;
 }
 
+/* Traps show while a maze is being built or edited, and hide while it is
+   growing, being searched or being solved. */
 .cell.trap-found::before,
-.cell.trap-sprung::before {
+.cell.trap-sprung::before,
+.maze-stage:not(.user-solving):not(.busy) .cell.trap::before {
   content: "";
   position: absolute;
   inset: 14%;
@@ -1608,7 +1617,8 @@ select:disabled {
 
   /* A printed maze is a fresh worksheet: its traps stay a secret. */
   .cell.trap-found::before,
-  .cell.trap-sprung::before { display: none; }
+  .cell.trap-sprung::before,
+  .cell.trap::before { display: none !important; }
 
   .cell.carve-trail,
   .cell.carve-spark,
@@ -2241,6 +2251,13 @@ select:disabled {
   font-weight: 800;
   color: #248a3d;
   background: rgba(48,209,88,0.14);
+}
+
+/* Trap notes in the Maze sheet: the orange burst instead of a tick. */
+.info-traps li::before {
+  content: "✷";
+  color: #c56a00;
+  background: rgba(255,159,10,0.16);
 }
 
 .info-callout {

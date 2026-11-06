@@ -177,6 +177,15 @@ keep their meaning), My Mazes remembers which traps a finish sprang, and the
 ghost falls into the same traps it did. Printed mazes keep their traps
 secret.
 
+To hide traps by hand, pick **Trap** beside Walls, Start and Finish under the
+maze and tap a square (tap it again to take the trap away, up to 6). Traps
+show as orange bursts while you build and hide while a maze grows, while
+the path is discovered and while someone solves. Hand edits keep the traps
+already there, but a hand-edited maze has no code, so it is not saved to My
+Mazes. If hand traps block every way through, Discover the Path walks
+through them rather than saying there is no route. The ⓘ on the Maze card
+explains traps; the switch itself carries no extra note.
+
 ## Kid Mode (for little kids)
 
 A picture-only way to play for children who cannot read yet. Tap the

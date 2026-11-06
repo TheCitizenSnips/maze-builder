@@ -43,7 +43,6 @@
   const codeNote = byId('codeNote');
   const printCode = byId('printCode');
   const trapsSwitch = byId('trapsSwitch');
-  const trapsNote = byId('trapsNote');
   const trapLegend = byId('trapLegend');
   // The shape pictures and masks come from shapes.js, loaded just before.
   const Shapes = window.MazeShapes;
@@ -149,7 +148,8 @@
   const buttons = {
     draw: byId('drawBtn'),
     start: byId('startBtn'),
-    end: byId('endBtn')
+    end: byId('endBtn'),
+    trap: byId('trapBtn')
   };
 
   // Before reloading, the offline copy is dropped: this app's service worker
@@ -324,6 +324,9 @@
   // The settings and seed the maze on screen grew from, while it is still
   // that maze; null for a blank or hand-edited one.
   let grownMaze = null;
+  // Trap squares in the maze on screen: hidden by the planner when a maze
+  // grows with Traps on, or placed by hand with the Trap tool.
+  let traps = [];
   let mode = 'draw';
   let drawing = false;
   let drawValue = true;
@@ -515,6 +518,9 @@
     buttons.draw.disabled = disabled;
     buttons.start.disabled = disabled;
     buttons.end.disabled = disabled;
+    buttons.trap.disabled = disabled;
+    // Built traps hide while a maze grows or is searched (styles.css).
+    mazeStage.classList.toggle('busy', disabled && running);
     document.getElementById('generateBtn').disabled = disabled;
     dailyBtn.disabled = disabled;
     codeBuildBtn.disabled = disabled;
@@ -599,9 +605,6 @@
 
   function syncTrapsUI() {
     trapsSwitch.setAttribute('aria-checked', String(trapsOn));
-    trapsNote.textContent = trapsOn
-      ? 'On. Hidden traps wait on the quicker ways, or in the dead ends when there is only one way. Step on one and you go back to S, but each one snaps only once.'
-      : 'Off. Switch on to hide a few traps in the next maze you grow.';
   }
 
   function setSize(nextSize) {
@@ -742,6 +745,7 @@
     walls = makeWalls(false);
 
     ({ start, end } = Shapes.ends(shapeId, size));
+    traps = [];
     setGrownMaze(null);
 
     render();
@@ -924,6 +928,7 @@
     if (data.solution) cellEl.classList.add('solution');
     if (data.solutionHead) cellEl.classList.add('solution-head');
     if (data.goalBurst) cellEl.classList.add('goal-burst');
+    if (traps.some(t => t.r === r && t.c === c)) cellEl.classList.add('trap');
     if (data.trapFound) cellEl.classList.add('trap-found');
     if (data.trapSprung) cellEl.classList.add('trap-sprung');
     if (data.trapSnap) cellEl.classList.add('trap-snap');
@@ -940,6 +945,7 @@
     if (mode === 'draw') setStatus('Walls mode: tap or drag along a grid line to add or remove a wall.', 'Editing');
     if (mode === 'start') setStatus('Tap a square to place the start.', 'Editing');
     if (mode === 'end') setStatus('Tap a square to place the finish.', 'Editing');
+    if (mode === 'trap') setStatus(`Tap a square to hide a trap there, or tap a trap to take it away. Up to ${TRAP_MAX}.`, 'Editing');
   }
 
   // While the player draws, no editing tool is lit: the maze is being
@@ -1006,6 +1012,11 @@
       return;
     }
 
+    if (mode === 'trap') {
+      toggleTrap(p, isStart || isEnd);
+      return;
+    }
+
     // S and E sharing a square would make a maze with nothing to solve.
     if ((mode === 'start' && isEnd) || (mode === 'end' && isStart)) {
       setStatus(
@@ -1019,7 +1030,10 @@
 
     if (mode === 'start') start = { r: p.r, c: p.c };
     else end = { r: p.r, c: p.c };
+    // S and F can never be traps.
+    traps = traps.filter(t => t.r !== p.r || t.c !== p.c);
     setGrownMaze(null);
+    trapLegend.hidden = !traps.length;
     clearSearchMarks();
     render();
     resetMetrics();
@@ -1028,6 +1042,32 @@
       : 'Finish moved. Ready to search for it.';
     setMode('draw');
     setStatus(moved, 'Editing');
+  }
+
+  // The Trap tool: a tap hides a trap on a square, or takes one away. A
+  // maze built by hand can hold up to TRAP_MAX, like a grown one, and
+  // has no code, so its traps live only on screen.
+  function toggleTrap(p, onEnd) {
+    if (onEnd) {
+      setStatus('S and F cannot be traps. Pick another square.', 'Editing');
+      return;
+    }
+    const had = traps.some(t => t.r === p.r && t.c === p.c);
+    if (!had && traps.length >= TRAP_MAX) {
+      setStatus(`A maze can hide ${TRAP_MAX} traps at most. Tap one to take it away first.`, 'Editing');
+      return;
+    }
+    traps = had
+      ? traps.filter(t => t.r !== p.r || t.c !== p.c)
+      : traps.concat({ r: p.r, c: p.c }).sort((a, b) => a.r - b.r || a.c - b.c);
+    setGrownMaze(null);
+    trapLegend.hidden = !traps.length;
+    clearSearchMarks();
+    render();
+    resetMetrics();
+    setStatus(had
+      ? `Trap taken away. ${traps.length ? `${traps.length} left.` : 'No traps left.'}`
+      : `Trap hidden. It shows while you build and hides while someone solves. ${traps.length} of ${TRAP_MAX}.`, 'Editing');
   }
 
   function paintEdge(edge, isInitial) {
@@ -1082,11 +1122,12 @@
       const p = pointCell(e.clientX, e.clientY, geo);
       if (!p) return;
       e.preventDefault();
-      const before = { start, end, mode, grown: grownMaze };
+      const before = { start, end, mode, grown: grownMaze, traps };
       placeMarker(p);
       strokeUndo = () => {
-        ({ start, end } = before);
+        ({ start, end, traps } = before);
         setGrownMaze(before.grown);
+        trapLegend.hidden = !traps.length;
         render();
         setMode(before.mode);
       };
@@ -1330,7 +1371,10 @@
     codeCopyBtn.disabled = !code;
     codeShareBtn.disabled = !code;
     printCode.textContent = code ? `Maze code ${code}` : '';
-    trapLegend.hidden = !(maze && maze.trapCells && maze.trapCells.length);
+    // A grown maze brings its own traps. Changing a maze by hand keeps the
+    // traps it has, like its S and F.
+    if (maze) traps = maze.trapCells || [];
+    trapLegend.hidden = !traps.length;
     syncSavedUI();
   }
 
@@ -2687,15 +2731,26 @@
     }, () => {});
   }
 
+  // The search steps round traps when it can. When traps built by hand
+  // block every way through, it searches again as if they were not there,
+  // so the maze still has a route (through a trap, for a player who dares).
   function computeBFSLayers() {
     if (!start || !end) return null;
+    if (grownTraps().length) {
+      const safe = searchLayers(true);
+      if (safe.found) return safe;
+    }
+    return searchLayers(false);
+  }
+
+  function searchLayers(avoidTraps) {
 
     const queue = [{ ...start, d: 0 }];
     const seen = new Set([key(start.r, start.c)]);
     const previous = new Map();
     const layers = [];
     const dirs = [[1,0], [0,1], [-1,0], [0,-1]];
-    const trapKeys = new Set(grownTraps().map(p => key(p.r, p.c)));
+    const trapKeys = new Set(avoidTraps ? grownTraps().map(p => key(p.r, p.c)) : []);
     const traps = [];
     let found = null;
 
@@ -3044,7 +3099,7 @@
   // The traps hidden in the maze on screen ([] when traps are off or the
   // maze was changed by hand), and whether a square holds one.
   function grownTraps() {
-    return (grownMaze && grownMaze.trapCells) || [];
+    return traps;
   }
 
   function isTrap(p) {
@@ -4498,6 +4553,7 @@
   buttons.draw.addEventListener('click', () => pickTool('draw'));
   buttons.start.addEventListener('click', () => pickTool('start'));
   buttons.end.addEventListener('click', () => pickTool('end'));
+  buttons.trap.addEventListener('click', () => pickTool('trap'));
 
   document.getElementById('generateBtn').addEventListener('click', animateMazeGrowth);
   dailyBtn.addEventListener('click', growDailyMaze);

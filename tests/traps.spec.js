@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { openApp, readMaze, cellsWithClass, blocked, shortestPath, wallCount, makePointer, defaultPointerType, traceCells, metric } = require('./helpers');
+const { openApp, readMaze, cellsWithClass, blocked, shortestPath, wallCount, blankRoute, makePointer, defaultPointerType, traceCells, metric } = require('./helpers');
 
 // Traps: an optional switch in the Maze card (off by default) hides a few
 // traps on the quicker ways of a maze with more than one way through. A trap
@@ -253,6 +253,55 @@ test.describe('Traps', () => {
     const onTrap = seen.indexOf('trap');
     expect(onTrap).toBeGreaterThan(0);
     expect(seen.slice(onTrap + 1)).toContain('S');
+    expect(page.mazeErrors).toEqual([]);
+  });
+  test('the Trap tool hides traps by hand: shown while building, hidden while solving', async ({ page }, testInfo) => {
+    await openApp(page, { size: 11 });
+    await expect(page.locator('#trapsNote')).toHaveCount(0);
+    const route = blankRoute(11);
+    const spot = route[4];
+    const trapCell = page.locator(`#maze .cell[data-r="${spot.r}"][data-c="${spot.c}"]`);
+    const markShown = () => trapCell.evaluate(el => getComputedStyle(el, '::before').content !== 'none');
+
+    await page.click('#trapBtn');
+    await expect(page.locator('#trapBtn')).toHaveClass(/active/);
+    await trapCell.click();
+    await expect(trapCell).toHaveClass(/trap/);
+    await expect(page.locator('#trapLegend')).toBeVisible();
+    expect(await markShown()).toBe(true);
+
+    // A second tap takes it away; S cannot be a trap.
+    await trapCell.click();
+    await expect(trapCell).not.toHaveClass(/\btrap\b/);
+    await page.locator('#maze .cell.start').click();
+    await expect(page.locator('#maze .cell.start')).not.toHaveClass(/\btrap\b/);
+    await expect(page.locator('#status')).toContainText('cannot be traps');
+
+    // At most six.
+    for (const p of route.slice(3, 10)) {
+      await page.locator(`#maze .cell[data-r="${p.r}"][data-c="${p.c}"]`).click();
+    }
+    await expect(page.locator('#maze .cell.trap')).toHaveCount(6);
+    await expect(page.locator('#status')).toContainText('6 traps at most');
+    // Keep just the one on the route.
+    for (const p of route.slice(3, 9)) {
+      if (p.r === spot.r && p.c === spot.c) continue;
+      await page.locator(`#maze .cell[data-r="${p.r}"][data-c="${p.c}"]`).click();
+    }
+    await expect(page.locator('#maze .cell.trap')).toHaveCount(1);
+
+    // Solving hides it, and it snaps like a grown one.
+    await page.click('#userSolveBtn');
+    await expect(page.locator('#phaseLabel')).toHaveText('Your Turn');
+    expect(await markShown()).toBe(false);
+    const pointer = await makePointer(page, defaultPointerType(testInfo));
+    await traceCells(page, route.slice(0, 5), { pointer });
+    await expect(page.locator('#phaseLabel')).toHaveText('Trapped');
+    await expect(trapCell).toHaveClass(/trap-sprung/);
+
+    // Back to building: the trap shows again.
+    await page.click('#userSolveBtn');
+    expect(await markShown()).toBe(true);
     expect(page.mazeErrors).toEqual([]);
   });
 });
